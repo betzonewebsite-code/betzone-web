@@ -75,21 +75,32 @@ type Wallet = {
   balance: string | number;
 };
 
-const API_URL = "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const TOKEN_KEY = "betzone_access_token";
 const USER_KEY = "betzone_user";
 
 export default function Home() {
   const [sports, setSports] = useState<Sport[]>([]);
   const [selectedSport, setSelectedSport] = useState("football");
+  const [sportsMenuOpen, setSportsMenuOpen] = useState(false);
 
   const [leagues, setLeagues] = useState<League[]>([]);
   const [selectedLeague, setSelectedLeague] = useState("");
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [odds, setOdds] = useState<Odd[]>([]);
+  const [footballQuickMatches, setFootballQuickMatches] = useState<Match[]>([]);
+  const [footballQuickOdds, setFootballQuickOdds] = useState<Odd[]>([]);
+  const [footballQuickLoading, setFootballQuickLoading] = useState(false);
 
   const [betSlip, setBetSlip] = useState<BetSelection[]>([]);
+  const [betSlipTab, setBetSlipTab] = useState<"betslip" | "cashout">("betslip");
+  const [myBetFilter, setMyBetFilter] = useState<"open" | "settled">("open");
+  const [myBets, setMyBets] = useState<any[]>([]);
+  const [myBetsLoading, setMyBetsLoading] = useState(false);
+  const [myBetsError, setMyBetsError] = useState("");
+  const [expandedMyBet, setExpandedMyBet] = useState<string | null>(null);
+  const [betSlipMode, setBetSlipMode] = useState<"real" | "sim">("real");
   const [betType, setBetType] = useState<
     "single" | "accumulator"
   >("single");
@@ -587,7 +598,21 @@ export default function Home() {
     }
 
     loadSports();
+    loadFootballQuickMatches();
+
+    const footballQuickTimer = window.setInterval(
+      loadFootballQuickMatches,
+      60_000,
+    );
+
+    return () => window.clearInterval(footballQuickTimer);
   }, []);
+
+  useEffect(() => {
+    if (betSlipTab === "cashout") {
+      loadMyBets();
+    }
+  }, [betSlipTab]);
 
   useEffect(() => {
     async function loadLeagues() {
@@ -744,6 +769,156 @@ export default function Home() {
 
     return grouped;
   }, [odds]);
+
+  async function loadFootballQuickMatches() {
+    try {
+      setFootballQuickLoading(true);
+
+      const leaguesResponse = await fetch(
+        `${API_URL}/sports/football/leagues`,
+      );
+
+      if (!leaguesResponse.ok) {
+        throw new Error("Unable to load football leagues.");
+      }
+
+      const footballLeagues: League[] = await leaguesResponse.json();
+      const leagueResults = await Promise.all(
+        footballLeagues.map(async (league) => {
+          try {
+            const response = await fetch(
+              `${API_URL}/sports/football/leagues/${league.id}/matches`,
+            );
+            if (!response.ok) return [];
+            return (await response.json()) as Match[];
+          } catch {
+            return [];
+          }
+        }),
+      );
+
+      const now = Date.now();
+      const threeHours = 3 * 60 * 60 * 1000;
+      const relevantMatches = leagueResults
+        .flat()
+        .filter((match) => {
+          const kickoff = new Date(match.kickoff_at).getTime();
+          if (!Number.isFinite(kickoff)) return false;
+          const status = String(match.status || "").toLowerCase();
+          const liveStatus = [
+            "live",
+            "in_play",
+            "in-play",
+            "inplay",
+            "started",
+          ].includes(status);
+          return liveStatus || (kickoff >= now && kickoff <= now + threeHours);
+        })
+        .sort((a, b) => {
+          const aLive = ["live", "in_play", "in-play", "inplay", "started"].includes(String(a.status || "").toLowerCase());
+          const bLive = ["live", "in_play", "in-play", "inplay", "started"].includes(String(b.status || "").toLowerCase());
+          if (aLive !== bLive) return aLive ? -1 : 1;
+          return new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime();
+        });
+
+      const uniqueMatches = Array.from(
+        new Map(relevantMatches.map((match) => [match.id, match])).values(),
+      );
+
+      const oddsResults = await Promise.all(
+        uniqueMatches.map(async (match) => {
+          const league = footballLeagues.find((item) => item.id === match.league_id);
+          if (!league) return [];
+          try {
+            const response = await fetch(
+              `${API_URL}/sports/football/leagues/${league.id}/matches/${match.id}/markets`,
+            );
+            if (!response.ok) return [];
+            return (await response.json()) as Odd[];
+          } catch {
+            return [];
+          }
+        }),
+      );
+
+      setFootballQuickMatches(uniqueMatches);
+      setFootballQuickOdds(oddsResults.flat());
+    } catch (err) {
+      console.error("Failed to load football quick matches", err);
+      setFootballQuickMatches([]);
+      setFootballQuickOdds([]);
+    } finally {
+      setFootballQuickLoading(false);
+    }
+  }
+
+  async function loadMyBets() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      setMyBets([]);
+      setMyBetsError("Log in to view your bets.");
+      return;
+    }
+
+    setMyBetsLoading(true);
+    setMyBetsError("");
+
+    try {
+      const response = await fetch(`${API_URL}/bets/my-bets`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = data?.message || data?.error || "Unable to load your bets.";
+        throw new Error(Array.isArray(message) ? message.join(", ") : message);
+      }
+
+      const loaded = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.bets)
+          ? data.bets
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+
+      setMyBets(loaded);
+    } catch (err) {
+      console.error("Failed to load my bets", err);
+      setMyBets([]);
+      setMyBetsError(
+        err instanceof Error ? err.message : "Unable to load your bets.",
+      );
+    } finally {
+      setMyBetsLoading(false);
+    }
+  }
+
+  const myOpenBets = useMemo(
+    () =>
+      myBets.filter((bet) => {
+        const status = String(bet.status || "").toLowerCase();
+        return ["open", "pending", "active", "unsettled"].includes(status);
+      }),
+    [myBets],
+  );
+
+  const mySettledBets = useMemo(
+    () =>
+      myBets.filter((bet) => {
+        const status = String(bet.status || "").toLowerCase();
+        return !["open", "pending", "active", "unsettled"].includes(status);
+      }),
+    [myBets],
+  );
+
+  function formatMyBetDate(value: unknown) {
+    if (!value) return "-";
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
+  }
 
   function get1X2Odds(match: Match) {
     const matchOdds =
@@ -1245,6 +1420,7 @@ export default function Home() {
 
       setBetSlip([]);
       setStake("");
+      void loadMyBets();
     } catch (err) {
       console.error(
         "Failed to place bet",
@@ -1595,37 +1771,179 @@ export default function Home() {
 
       {/* SPORTS */}
       <section className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3">
-          {loadingSports ? (
-            <div className="px-3 py-2 text-sm text-gray-500">
-              Loading sports...
-            </div>
-          ) : (
-            sports.map(
-              (sport) => (
-                <button
-                  key={sport.id}
-                  onClick={() =>
-                    setSelectedSport(
-                      sport.sport_key,
-                    )
-                  }
-                  className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold transition ${
-                    selectedSport ===
-                    sport.sport_key
-                      ? "border-[#071b34] bg-[#071b34] text-white"
-                      : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {sport.sport_name}
-                </button>
-              ),
-            )
-          )}
+        <div className="mx-auto max-w-7xl px-4 py-3">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSportsMenuOpen((open) => !open)}
+              className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left shadow-sm transition hover:border-[#071b34] sm:w-auto sm:min-w-[240px]"
+            >
+              <span>
+                <span className="block text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  All Sports
+                </span>
+                <span className="mt-0.5 block text-sm font-black text-[#071b34]">
+                  {sports.find((sport) => sport.sport_key === selectedSport)?.sport_name || "Football"}
+                </span>
+              </span>
+              <span className="ml-4 text-lg text-gray-500">{sportsMenuOpen ? "⌃" : "⌄"}</span>
+            </button>
+
+            {sportsMenuOpen && (
+              <div className="absolute left-0 top-full z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl sm:w-[520px]">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {sports.map((sport) => (
+                    <button
+                      key={sport.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSport(sport.sport_key);
+                        setSportsMenuOpen(false);
+                      }}
+                      className={`rounded-xl px-3 py-3 text-left text-xs font-black transition ${
+                        selectedSport === sport.sport_key
+                          ? "bg-[#071b34] text-white"
+                          : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      {sport.sport_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      {/* FOOTBALL LIVE + NEXT 3 HOURS */}
+      <section className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 pb-4">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between bg-[#071b34] px-4 py-3 text-white sm:px-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  <h2 className="text-sm font-black">Football · Live & Next 3 Hours</h2>
+                </div>
+                <p className="mt-1 text-[10px] text-white/60">Today’s quickest football matches to watch and bet.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadFootballQuickMatches}
+                disabled={footballQuickLoading}
+                className="rounded-lg border border-white/20 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-white/10 disabled:opacity-50"
+              >
+                {footballQuickLoading ? "Loading" : "Refresh"}
+              </button>
+            </div>
+
+            <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+              {footballQuickMatches.slice(0, 6).map((match) => {
+                const matchOdds = footballQuickOdds.filter((odd) => odd.match_id === match.id && odd.is_active);
+                const oneXTwo = matchOdds.filter((odd) =>
+                  odd.sports_markets?.market_key === "1x2" || odd.market === "1x2" || odd.market === "h2h",
+                );
+                const homeOdd = oneXTwo.find((odd) => odd.selection === "1" || odd.selection === match.home_team);
+                const drawOdd = oneXTwo.find((odd) => odd.selection === "X" || odd.selection === "Draw");
+                const awayOdd = oneXTwo.find((odd) => odd.selection === "2" || odd.selection === match.away_team);
+                const status = String(match.status || "").toLowerCase();
+                const live = ["live", "in_play", "in-play", "inplay", "started"].includes(status);
+
+                return (
+                  <div key={match.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[9px] font-black uppercase tracking-wide ${live ? "text-red-600" : "text-gray-400"}`}>
+                        {live ? "LIVE" : new Date(match.kickoff_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="truncate text-[9px] font-bold text-gray-400">Football</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openMatchDetails(match)}
+                      className="mt-2 w-full text-left"
+                    >
+                      <div className="text-xs font-black text-gray-900">{match.home_team}</div>
+                      <div className="mt-1 text-xs font-black text-gray-900">{match.away_team}</div>
+                    </button>
+                    <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      {[
+                        ["1", homeOdd],
+                        ["X", drawOdd],
+                        ["2", awayOdd],
+                      ].map((item) => {
+                        const label = String(item[0]);
+                        const odd = item[1];
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            disabled={!odd || typeof odd === "string"}
+                            onClick={() =>
+                              odd && typeof odd !== "string"
+                                ? toggleBet(match, odd)
+                                : undefined
+                            }
+                            className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-center transition hover:border-[#071b34] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <span className="block text-[9px] font-bold text-gray-400">{label}</span>
+                            <span className="mt-0.5 block text-xs font-black text-[#071b34]">
+                              {odd && typeof odd !== "string"
+                                ? Number(odd.odds).toFixed(2)
+                                : "-"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {!footballQuickLoading && footballQuickMatches.length === 0 && (
+                <div className="sm:col-span-2 lg:col-span-3 px-4 py-6 text-center text-xs font-semibold text-gray-500">
+                  No football matches are live or starting within the next 3 hours.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[220px_minmax(0,1fr)_380px]">
+        {/* LEAGUES */}
+        <aside className="h-fit overflow-hidden rounded-2xl bg-white shadow-sm lg:sticky lg:top-20">
+          <div className="border-b border-gray-200 bg-[#071b34] px-4 py-3">
+            <h2 className="text-sm font-black uppercase tracking-wide text-white">
+              Popular
+            </h2>
+          </div>
+          <div className="max-h-[600px] overflow-y-auto">
+            {leagues.length > 0 ? (
+              leagues.map((league) => (
+                <button
+                  key={league.id}
+                  onClick={() => setSelectedLeague(league.id)}
+                  className={`flex w-full items-center justify-between border-b border-gray-200 px-4 py-3 text-left text-sm font-bold transition ${
+                    selectedLeague === league.id
+                      ? "bg-[#071b34] text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="min-w-0 truncate">{league.name}</span>
+                  <span className={`ml-2 shrink-0 text-lg leading-none ${selectedLeague === league.id ? "text-[#f5b400]" : "text-gray-400"}`}>
+                    ›
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="px-4 py-4 text-sm text-gray-500">
+                No leagues available yet.
+              </p>
+            )}
+          </div>
+        </aside>
+
         {/* MAIN */}
         <section className="min-w-0">
           <div className="mb-5 overflow-hidden rounded-2xl bg-[#071b34] p-6 text-white shadow-sm sm:p-7">
@@ -1684,35 +2002,8 @@ export default function Home() {
                 </div>
               </div>
 
-              {leagues.length > 0 ? (
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                  {leagues.map(
-                    (league) => (
-                      <button
-                        key={league.id}
-                        onClick={() =>
-                          setSelectedLeague(
-                            league.id,
-                          )
-                        }
-                        className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold transition ${
-                          selectedLeague ===
-                          league.id
-                            ? "bg-[#071b34] text-white shadow-sm"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
-                      >
-                        {league.name}
-                      </button>
-                    ),
-                  )}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-gray-500">
-                  No leagues available yet.
-                </p>
-              )}
-            </div>
+
+              </div>
 
             {error && (
               <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:m-5">
@@ -1996,329 +2287,474 @@ export default function Home() {
         </section>
 
         {/* BET SLIP */}
-        <aside className="h-fit rounded-2xl bg-white shadow-sm lg:sticky lg:top-20">
-          <div className="border-b border-gray-100 px-5 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-black text-gray-900">
-                  Bet Slip
-                </h2>
+        <aside className="h-fit overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg lg:sticky lg:top-20">
+          {/* BETSLIP / CASHOUT TABS */}
+          <div className="border-b border-gray-200 bg-[#071b34] px-3 pt-2">
+            <div className="grid grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setBetSlipTab("betslip")}
+                className={`relative px-3 py-3 text-sm font-black transition ${
+                  betSlipTab === "betslip"
+                    ? "text-white"
+                    : "text-white/55 hover:text-white"
+                }`}
+              >
+                Betslip
+                {betSlip.length > 0 && (
+                  <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-[#f5b400] px-1.5 py-0.5 text-[10px] font-black text-[#071b34]">
+                    {betSlip.length}
+                  </span>
+                )}
+                {betSlipTab === "betslip" && (
+                  <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-[#f5b400]" />
+                )}
+              </button>
 
-                <p className="text-xs text-gray-500">
-                  {betSlip.length}{" "}
-                  {betSlip.length ===
-                  1
-                    ? "selection"
-                    : "selections"}
-                </p>
-              </div>
-
-              {betSlip.length >
-                0 && (
-                <button
-                  onClick={
-                    clearBetSlip
-                  }
-                  disabled={
-                    betSubmitting
-                  }
-                  className="text-xs font-bold text-red-500 transition hover:text-red-700 disabled:opacity-50"
-                >
-                  Clear all
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setBetSlipTab("cashout")}
+                className={`relative px-3 py-3 text-sm font-black transition ${
+                  betSlipTab === "cashout"
+                    ? "text-white"
+                    : "text-white/55 hover:text-white"
+                }`}
+              >
+                My Bet
+                {betSlipTab === "cashout" && (
+                  <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-[#f5b400]" />
+                )}
+              </button>
             </div>
           </div>
 
-          <div className="p-5">
-            {betSlip.length ===
-            0 ? (
-              <div>
-                {betSuccess && (
-                  <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4">
-                    <p className="text-sm font-bold text-green-700">
-                      {betSuccess}
-                    </p>
-                  </div>
-                )}
+          {/* REAL / SIM */}
+          {betSlipTab === "betslip" && (
+          <div className="border-b border-gray-100 bg-white px-4 py-3">
+            <div className="inline-flex overflow-hidden rounded-full border border-gray-300 bg-gray-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => setBetSlipMode("real")}
+                className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                  betSlipMode === "real"
+                    ? "bg-[#1b9b52] text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Real
+              </button>
+              <button
+                type="button"
+                onClick={() => setBetSlipMode("sim")}
+                className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                  betSlipMode === "sim"
+                    ? "bg-[#071b34] text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Sim
+              </button>
+            </div>
+          </div>
+          )}
 
-                {betError && (
-                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
-                    <p className="text-sm font-bold text-red-700">
-                      {betError}
-                    </p>
-                  </div>
-                )}
-
-                <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center">
-                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-lg font-bold text-gray-400">
-                    +
-                  </div>
-
-                  <p className="mt-3 text-sm font-bold text-gray-500">
-                    Your bet slip is empty
-                  </p>
-
-                  <p className="mt-1 text-xs leading-5 text-gray-400">
-                    Select an odd to add it to your bet slip.
-                  </p>
+          {betSlipTab === "cashout" ? (
+            <div className="p-4 sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black text-gray-900">My Bet</h3>
+                  <p className="mt-1 text-[10px] text-gray-400">Your open and settled bets.</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={loadMyBets}
+                  disabled={myBetsLoading}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black text-[#071b34] disabled:opacity-50"
+                >
+                  {myBetsLoading ? "Loading" : "Refresh"}
+                </button>
               </div>
-            ) : (
-              <>
-                {betError && (
-                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
-                    <p className="text-sm font-bold text-red-700">
-                      {betError}
-                    </p>
-                  </div>
-                )}
 
-                {betSuccess && (
-                  <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4">
-                    <p className="text-sm font-bold text-green-700">
-                      {betSuccess}
-                    </p>
-                  </div>
-                )}
+              <div className="mb-4 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setMyBetFilter("open")}
+                  className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wide ${myBetFilter === "open" ? "bg-white text-[#071b34] shadow-sm" : "text-gray-500"}`}
+                >
+                  Open ({myOpenBets.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMyBetFilter("settled")}
+                  className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wide ${myBetFilter === "settled" ? "bg-white text-[#071b34] shadow-sm" : "text-gray-500"}`}
+                >
+                  Settled ({mySettledBets.length})
+                </button>
+              </div>
 
-                <div className="mb-4 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
-                  <button
-                    onClick={() => {
-                      setBetType(
-                        "single",
-                      );
-                      setBetError("");
-                      setBetSuccess("");
-                    }}
-                    disabled={
-                      betSubmitting
-                    }
-                    className={`rounded-lg py-2.5 text-xs font-black transition ${
-                      betType ===
-                      "single"
-                        ? "bg-white text-[#071b34] shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    } disabled:opacity-50`}
-                  >
-                    Singles
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setBetType(
-                        "accumulator",
-                      );
-                      setBetError("");
-                      setBetSuccess("");
-                    }}
-                    disabled={
-                      betSubmitting
-                    }
-                    className={`rounded-lg py-2.5 text-xs font-black transition ${
-                      betType ===
-                      "accumulator"
-                        ? "bg-white text-[#071b34] shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    } disabled:opacity-50`}
-                  >
-                    Accumulator
-                  </button>
+              {myBetsError && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-xs font-semibold text-red-700">
+                  {myBetsError}
                 </div>
+              )}
 
-                {betType ===
-                  "accumulator" &&
-                  betSlip.length <
-                    2 && (
-                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium leading-5 text-amber-700">
+              {myBetsLoading ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-xs font-semibold text-gray-500">
+                  Loading your bets...
+                </div>
+              ) : (myBetFilter === "open" ? myOpenBets : mySettledBets).length === 0 ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                  <div className="text-2xl text-gray-300">▱</div>
+                  <p className="mt-2 text-xs font-black text-gray-600">
+                    {myBetFilter === "open" ? "No open bets" : "No settled bets"}
+                  </p>
+                  <p className="mt-1 text-[10px] leading-4 text-gray-400">
+                    Your {myBetFilter} bets will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(myBetFilter === "open" ? myOpenBets : mySettledBets).map((bet) => {
+                    const status = String(bet.status || "open").toUpperCase();
+                    const selections = Array.isArray(bet.bet_selections) ? bet.bet_selections : Array.isArray(bet.selections) ? bet.selections : [];
+                    const totalOdds = Number(bet.total_odds ?? bet.odds ?? 0);
+                    const stakeValue = Number(bet.stake ?? 0);
+                    const storedPayout = Number(
+                      bet.potential_payout ??
+                        bet.potential_win ??
+                        bet.payout ??
+                        bet.winnings ??
+                        0,
+                    );
+                    const payout =
+                      status === "WON" &&
+                      storedPayout <= 0 &&
+                      stakeValue > 0 &&
+                      totalOdds > 0
+                        ? stakeValue * totalOdds
+                        : storedPayout;
+                    const betId = String(bet.id ?? bet.bet_reference ?? Math.random());
+                    return (
+                      <div key={betId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-black text-[#071b34]">
+                              {bet.bet_reference || betId}
+                            </div>
+                            <div className="mt-1 text-[10px] text-gray-400">
+                              {bet.bet_type || "Bet"} · {formatMyBetDate(bet.created_at || bet.placed_at || bet.updated_at)}
+                            </div>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${status === "WON" ? "bg-green-100 text-green-700" : status === "LOST" ? "bg-red-100 text-red-700" : status === "OPEN" || status === "PENDING" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                            {status}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2 border-y border-gray-100 py-3">
+                          <div><div className="text-[9px] uppercase tracking-wide text-gray-400">Stake</div><div className="mt-1 text-xs font-black">GHS {stakeValue.toFixed(2)}</div></div>
+                          <div><div className="text-[9px] uppercase tracking-wide text-gray-400">Odds</div><div className="mt-1 text-xs font-black">{totalOdds > 0 ? totalOdds.toFixed(2) : "-"}</div></div>
+                          <div><div className="text-[9px] uppercase tracking-wide text-gray-400">Return</div><div className="mt-1 text-xs font-black text-[#1b9b52]">GHS {payout > 0 ? payout.toFixed(2) : "0.00"}</div></div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setExpandedMyBet(expandedMyBet === betId ? null : betId)}
+                          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black text-[#071b34]"
+                        >
+                          {expandedMyBet === betId ? "Hide Selections" : `View ${selections.length} Selection${selections.length === 1 ? "" : "s"}`}
+                        </button>
+
+                        {expandedMyBet === betId && (
+                          <div className="mt-2 space-y-2">
+                            {selections.length > 0 ? selections.map((selection: any, index: number) => (
+                              <div key={String(selection.id ?? index)} className="rounded-lg bg-gray-50 p-3">
+                                <div className="text-xs font-black text-gray-800">{selection.selection || selection.outcome || "Selection"}</div>
+                                <div className="mt-1 text-[10px] text-gray-500">
+                                  Odds {Number(selection.odds ?? selection.price ?? 0) > 0 ? Number(selection.odds ?? selection.price).toFixed(2) : "-"}
+                                  {selection.result ? ` · ${selection.result}` : " · Pending"}
+                                </div>
+                              </div>
+                            )) : (
+                              <div className="rounded-lg bg-gray-50 p-3 text-[10px] text-gray-500">Selection details are not available for this bet.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 sm:p-5">
+              {betSlipMode === "sim" && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-[11px] font-semibold leading-5 text-blue-700">
+                  Simulation mode is for testing selections and payouts. Real bets are not placed from this mode.
+                </div>
+              )}
+
+              {betError && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                  <p className="text-xs font-bold leading-5 text-red-700">
+                    {betError}
+                  </p>
+                </div>
+              )}
+
+              {betSuccess && (
+                <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3">
+                  <p className="text-xs font-bold leading-5 text-green-700">
+                    {betSuccess}
+                  </p>
+                </div>
+              )}
+
+              {betSlip.length === 0 ? (
+                <div>
+                  <div className="rounded-xl border border-gray-200 bg-white px-3 py-5 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-2xl font-light text-gray-400">
+                      +
+                    </div>
+                    <p className="mt-3 text-sm font-black text-gray-700">
+                      Your betslip is empty
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-gray-400">
+                      To place a bet, click on the odds or load a booking code.
+                    </p>
+                  </div>
+
+                  <div className="mt-4">
+                    <label
+                      htmlFor="emptySlipBookingCode"
+                      className="sr-only"
+                    >
+                      Booking Code
+                    </label>
+                    <input
+                      id="emptySlipBookingCode"
+                      value={loadBetReference}
+                      onChange={(event) =>
+                        setLoadBetReference(event.target.value.toUpperCase())
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          handleLoadBet();
+                        }
+                      }}
+                      placeholder="Booking Code"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-xs font-bold uppercase tracking-wide text-gray-900 outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-gray-400 focus:border-[#071b34] focus:ring-2 focus:ring-[#071b34]/10"
+                      disabled={loadBetLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleLoadBet}
+                      disabled={loadBetLoading || !loadBetReference.trim()}
+                      className="mt-2.5 w-full rounded-lg bg-[#071b34] py-3 text-xs font-black text-white transition hover:bg-[#102c50] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    >
+                      {loadBetLoading ? "Loading..." : "Load"}
+                    </button>
+                  </div>
+
+                  <p className="mt-3 text-[10px] leading-4 text-gray-400">
+                    A booking code enables you to transfer a betslip between different devices.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                        {betSlip.length} {betSlip.length === 1 ? "Selection" : "Selections"}
+                      </p>
+                      <p className="mt-0.5 text-sm font-black text-gray-900">
+                        {betType === "accumulator" ? "Accumulator" : "Singles"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearBetSlip}
+                      disabled={betSubmitting}
+                      className="text-[10px] font-black uppercase tracking-wide text-red-500 transition hover:text-red-700 disabled:opacity-50"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+
+                  <div className="mb-4 grid grid-cols-2 rounded-lg bg-gray-100 p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBetType("single");
+                        setBetError("");
+                        setBetSuccess("");
+                      }}
+                      disabled={betSubmitting}
+                      className={`rounded-md py-2 text-[11px] font-black transition ${
+                        betType === "single"
+                          ? "bg-white text-[#071b34] shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      } disabled:opacity-50`}
+                    >
+                      Singles
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBetType("accumulator");
+                        setBetError("");
+                        setBetSuccess("");
+                      }}
+                      disabled={betSubmitting}
+                      className={`rounded-md py-2 text-[11px] font-black transition ${
+                        betType === "accumulator"
+                          ? "bg-white text-[#071b34] shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      } disabled:opacity-50`}
+                    >
+                      Accumulator
+                    </button>
+                  </div>
+
+                  {betType === "accumulator" && betSlip.length < 2 && (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold leading-5 text-amber-700">
                       Add at least two selections to create an accumulator.
                     </div>
                   )}
 
-                <div className="space-y-3">
-                  {betSlip.map(
-                    (
-                      selection,
-                      index,
-                    ) => (
+                  <div className="space-y-2.5">
+                    {betSlip.map((selection, index) => (
                       <div
-                        key={
-                          selection.oddId
-                        }
+                        key={selection.oddId}
                         className="rounded-xl border border-gray-200 bg-gray-50 p-3"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="mb-2 flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#071b34] text-[9px] font-black text-white">
-                                {index +
-                                  1}
+                                {index + 1}
                               </span>
-
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                Selection
+                              <span className="truncate text-[10px] font-black uppercase tracking-wide text-gray-400">
+                                {selection.market || "Market"}
                               </span>
                             </div>
 
-                            <p className="truncate text-xs font-black text-gray-900">
-                              {
-                                selection.homeTeam
-                              }
+                            <p className="mt-2 truncate text-xs font-black text-gray-900">
+                              {selection.homeTeam}
+                              <span className="mx-1 text-gray-300">vs</span>
+                              {selection.awayTeam}
                             </p>
 
-                            <p className="truncate text-xs font-black text-gray-900">
-                              {
-                                selection.awayTeam
-                              }
-                            </p>
-
-                            <div className="mt-2 flex items-center gap-2">
-                              <span className="rounded-md bg-white px-2 py-1 text-[10px] font-black text-gray-600 shadow-sm">
-                                {
-                                  selection.selection
-                                }
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate rounded-md bg-white px-2 py-1 text-[10px] font-black text-gray-600 shadow-sm">
+                                {selection.selection}
                               </span>
-
-                              <span className="text-xs text-gray-400">
-                                {selection.odds.toFixed(
-                                  2,
-                                )}
+                              <span className="shrink-0 rounded-md bg-[#fff5c9] px-2 py-1 text-[11px] font-black text-[#071b34]">
+                                {selection.odds.toFixed(2)}
                               </span>
                             </div>
                           </div>
 
                           <button
-                            onClick={() =>
-                              removeBet(
-                                selection.oddId,
-                              )
-                            }
-                            disabled={
-                              betSubmitting
-                            }
-                            className="shrink-0 text-lg leading-none text-gray-400 transition hover:text-red-500 disabled:opacity-50"
+                            type="button"
+                            onClick={() => removeBet(selection.oddId)}
+                            disabled={betSubmitting}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg leading-none text-gray-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                             aria-label="Remove selection"
                           >
                             ×
                           </button>
                         </div>
                       </div>
-                    ),
-                  )}
-                </div>
+                    ))}
+                  </div>
 
-                <div className="mt-5">
-                  <label
-                    htmlFor="stake"
-                    className="mb-2 block text-xs font-black uppercase tracking-wide text-gray-500"
+                  <div className="mt-4">
+                    <label
+                      htmlFor="stake"
+                      className="mb-2 block text-[10px] font-black uppercase tracking-wide text-gray-500"
+                    >
+                      Stake
+                    </label>
+                    <div className="flex overflow-hidden rounded-lg border border-gray-300 bg-white focus-within:border-[#071b34] focus-within:ring-2 focus-within:ring-[#071b34]/10">
+                      <span className="flex items-center border-r border-gray-200 bg-gray-50 px-3 text-xs font-black text-gray-500">
+                        GHS
+                      </span>
+                      <input
+                        id="stake"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={stake}
+                        onChange={(event) => {
+                          setStake(event.target.value);
+                          setBetError("");
+                          setBetSuccess("");
+                        }}
+                        placeholder="0.00"
+                        disabled={betSubmitting}
+                        className="min-w-0 flex-1 px-3 py-3 text-sm font-black text-gray-900 outline-none placeholder:text-gray-300 disabled:bg-gray-50"
+                      />
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-4 gap-1.5">
+                      {[10, 20, 50, 100].map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => setStake(String(amount))}
+                          disabled={betSubmitting}
+                          className="rounded-md border border-gray-200 bg-gray-50 py-1.5 text-[10px] font-black text-gray-600 transition hover:border-[#071b34] hover:bg-white hover:text-[#071b34] disabled:opacity-50"
+                        >
+                          {amount}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">Total odds</span>
+                      <span className="font-black text-gray-900">
+                        {combinedOdds > 0 ? combinedOdds.toFixed(2) : "0.00"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 text-xs">
+                      <span className="font-bold text-gray-600">Potential payout</span>
+                      <span className="font-black text-[#071b34]">
+                        GHS {potentialPayout > 0 ? potentialPayout.toFixed(2) : "0.00"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handlePlaceBet}
+                    disabled={
+                      betSubmitting ||
+                      betSlipMode === "sim" ||
+                      betSlip.length === 0 ||
+                      (betType === "accumulator" && betSlip.length < 2) ||
+                      !Number.isFinite(numericStake) ||
+                      numericStake <= 0
+                    }
+                    className="mt-4 w-full rounded-lg bg-[#f5b400] py-3.5 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Stake
-                  </label>
+                    {betSubmitting
+                      ? "Placing bet..."
+                      : betSlipMode === "sim"
+                        ? "Simulation Mode"
+                        : "Place Bet"}
+                  </button>
 
-                  <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:border-[#071b34]">
-                    <span className="flex items-center border-r border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-500">
-                      GHS
-                    </span>
-
-                    <input
-                      id="stake"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={stake}
-                      onChange={(
-                        event,
-                      ) => {
-                        setStake(
-                          event.target
-                            .value,
-                        );
-                        setBetError("");
-                        setBetSuccess("");
-                      }}
-                      placeholder="0.00"
-                      disabled={
-                        betSubmitting
-                      }
-                      className="min-w-0 flex-1 px-3 py-3 text-sm font-bold text-gray-900 outline-none placeholder:text-gray-300 disabled:bg-gray-50"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl bg-gray-50 p-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">
-                      Bet type
-                    </span>
-
-                    <span className="font-bold capitalize text-gray-900">
-                      {betType}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">
-                      Total odds
-                    </span>
-
-                    <span className="font-black text-gray-900">
-                      {combinedOdds >
-                      0
-                        ? combinedOdds.toFixed(
-                            2,
-                          )
-                        : "0.00"}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 text-sm">
-                    <span className="font-semibold text-gray-600">
-                      Potential payout
-                    </span>
-
-                    <span className="font-black text-[#071b34]">
-                      GHS{" "}
-                      {potentialPayout >
-                      0
-                        ? potentialPayout.toFixed(
-                            2,
-                          )
-                        : "0.00"}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={
-                    handlePlaceBet
-                  }
-                  disabled={
-                    betSubmitting ||
-                    betSlip.length ===
-                      0 ||
-                    (betType ===
-                      "accumulator" &&
-                      betSlip.length <
-                        2) ||
-                    !Number.isFinite(
-                      numericStake,
-                    ) ||
-                    numericStake <= 0
-                  }
-                  className="mt-4 w-full rounded-xl bg-[#f5b400] py-3.5 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {betSubmitting
-                    ? "Placing bet..."
-                    : "Continue"}
-                </button>
-
-                <p className="mt-3 text-center text-[10px] leading-4 text-gray-400">
-                  Final odds and payout will be validated by the BETZONE server before a bet is placed.
-                </p>
-              </>
-            )}
-          </div>
+                  <p className="mt-3 text-center text-[10px] leading-4 text-gray-400">
+                    {betSlipMode === "sim"
+                      ? "Simulation mode is currently for preview only."
+                      : "Final odds and payout will be validated by the BETZONE server before a bet is placed."}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </aside>
       </div>
 
