@@ -499,6 +499,9 @@ export default function AdminPage() {
   const [section, setSection] =
     useState<AdminSection>("dashboard");
 
+  const [mobileAdminMenuOpen, setMobileAdminMenuOpen] =
+    useState(false);
+
   // Platform Settings — interface state. Backend persistence and enforcement
   // will be connected after this admin UI is in place.
   const [platformName, setPlatformName] = useState("BETZONE");
@@ -3290,6 +3293,7 @@ export default function AdminPage() {
     next: AdminSection,
   ) {
     setSection(next);
+    setMobileAdminMenuOpen(false);
 
     // Every admin section is a page-level view. Always return the
     // viewport to the top when switching sections so a newly selected
@@ -3433,7 +3437,7 @@ export default function AdminPage() {
             SIDEBAR
         ====================================================== */}
 
-        <aside className="w-full shrink-0 bg-[#071b34] text-white lg:w-64">
+        <aside className="hidden w-full shrink-0 bg-[#071b34] text-white lg:block lg:w-64">
           <div className="sticky top-0 flex max-h-screen flex-col">
             <div className="border-b border-white/10 px-5 py-4">
               <div className="text-2xl font-black tracking-tight">
@@ -3558,10 +3562,19 @@ export default function AdminPage() {
               <div className="hidden rounded-xl bg-slate-100 px-4 py-2 text-xs font-black text-slate-500 sm:block">
                 Protected Admin Area
               </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileAdminMenuOpen(true)}
+                className="rounded-xl bg-[#071b34] px-3 py-2 text-xs font-black text-white shadow-sm lg:hidden"
+                aria-label="Open admin menu"
+              >
+                Menu
+              </button>
             </div>
           </header>
 
-          <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-7xl p-3 pb-24 sm:p-6 sm:pb-6 lg:p-8">
 
             {/* ==================================================
                 DASHBOARD
@@ -7449,6 +7462,111 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* ========================================================
+          MOBILE ADMIN NAVIGATION
+      ======================================================== */}
+
+      <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-slate-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-8px_30px_rgba(7,27,52,0.12)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
+          {[
+            ["dashboard", "Home", "⌂"],
+            ["bets", "Bets", "▣"],
+            ["matches", "Sports", "⚽"],
+            ["wallet", "Wallet", "₵"],
+          ].map(([key, label, icon]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => navigate(key as AdminSection)}
+              className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-1 py-1 ${
+                section === key
+                  ? "bg-[#071b34] text-[#f5b400]"
+                  : "text-slate-500"
+              }`}
+            >
+              <span className="text-base font-black leading-none">{icon}</span>
+              <span className="mt-1 text-[9px] font-black uppercase tracking-wide">{label}</span>
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setMobileAdminMenuOpen(true)}
+            className="flex min-h-14 flex-col items-center justify-center rounded-xl px-1 py-1 text-slate-500"
+          >
+            <span className="text-base font-black leading-none">☰</span>
+            <span className="mt-1 text-[9px] font-black uppercase tracking-wide">More</span>
+          </button>
+        </div>
+      </div>
+
+      {mobileAdminMenuOpen && (
+        <div
+          className="fixed inset-0 z-[80] bg-[#071b34]/60 lg:hidden"
+          onClick={() => setMobileAdminMenuOpen(false)}
+        >
+          <div
+            className="absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#b57e00]">BETZONE ADMIN</p>
+                <h2 className="mt-1 text-xl font-black text-[#071b34]">Admin Menu</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileAdminMenuOpen(false)}
+                className="rounded-xl bg-slate-100 px-3 py-2 text-xl font-black text-slate-500"
+                aria-label="Close admin menu"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {[
+                ["dashboard", "Dashboard", "Overview"],
+                ["bets", "All Bets", "Customer bets"],
+                ["settlement", "Settlement", "Settle results"],
+                ["matches", "Matches & Odds", "Markets and odds"],
+                ["match-management", "Matches", "Manage matches"],
+                ["deposits", "Deposits", "Review deposits"],
+                ["withdrawals", "Withdrawals", "Review withdrawals"],
+                ["users", "Users", "Customers"],
+                ["wallet", "Wallet", "Balances"],
+                ["platform-settings", "Settings", "Platform controls"],
+                ["admin-security", "Security", "Admin security"],
+              ].map(([key, label, description]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => navigate(key as AdminSection)}
+                  className={`min-h-24 rounded-2xl border p-4 text-left transition ${
+                    section === key
+                      ? "border-[#f5b400] bg-[#fff8df]"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className="text-sm font-black text-[#071b34]">{label}</div>
+                  <div className="mt-1 text-[11px] font-semibold leading-4 text-slate-500">{description}</div>
+                </button>
+              ))}
+
+              <a
+                href="/admin/audit-history"
+                className="min-h-24 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left"
+              >
+                <div className="text-sm font-black text-[#071b34]">Audit History</div>
+                <div className="mt-1 text-[11px] font-semibold leading-4 text-slate-500">Review admin activity</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }
