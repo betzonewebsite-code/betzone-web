@@ -135,6 +135,7 @@ export default function Home() {
 
   const [betSlip, setBetSlip] = useState<BetSelection[]>([]);
   const [betSlipTab, setBetSlipTab] = useState<"betslip" | "cashout">("betslip");
+  const [mobileBetSlipOpen, setMobileBetSlipOpen] = useState(false);
   const [myBetFilter, setMyBetFilter] = useState<"open" | "settled">("open");
   const [myBets, setMyBets] = useState<BetRecord[]>([]);
   const [myBetsLoading, setMyBetsLoading] = useState(false);
@@ -1821,7 +1822,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
+    <main className="betzone-page min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-[#071b34] text-white shadow-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3">
@@ -2558,8 +2559,38 @@ export default function Home() {
           </div>
         </section>
 
+        {/* MOBILE BETSLIP OVERLAY BACKDROP */}
+        {mobileBetSlipOpen && (
+          <button
+            type="button"
+            aria-label="Close betslip"
+            onClick={() => setMobileBetSlipOpen(false)}
+            className="fixed inset-0 z-[58] bg-[#071b34]/70 backdrop-blur-[2px] lg:hidden"
+          />
+        )}
+
         {/* BET SLIP */}
-        <aside id="mobile-betslip" className="h-fit overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg lg:sticky lg:top-20">
+        <aside
+          id="mobile-betslip"
+          className={`${
+            mobileBetSlipOpen
+              ? "fixed inset-x-0 bottom-0 z-[60] block max-h-[calc(100dvh-64px)] overflow-y-auto rounded-t-3xl border border-gray-200 bg-white shadow-[0_-18px_50px_rgba(7,27,52,0.28)]"
+              : "hidden"
+          } h-fit overflow-hidden lg:sticky lg:top-20 lg:block lg:max-h-none lg:overflow-hidden lg:rounded-2xl lg:border lg:border-gray-200 lg:bg-white lg:shadow-lg`}
+        >
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#071b34] px-4 py-2 lg:hidden">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">
+              BETZONE
+            </span>
+            <button
+              type="button"
+              onClick={() => setMobileBetSlipOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg font-bold text-white transition hover:bg-white/20"
+              aria-label="Close betslip"
+            >
+              ×
+            </button>
+          </div>
           {/* BETSLIP / CASHOUT TABS */}
           <div className="border-b border-gray-200 bg-[#071b34] px-3 pt-2">
             <div className="grid grid-cols-2">
@@ -4526,6 +4557,35 @@ export default function Home() {
           </div>
         </div>
       )}
+      <style jsx global>{`
+        @media (max-width: 639px) {
+          .betzone-page [class*="text-2xl"] {
+            font-size: 1.25rem !important;
+            line-height: 1.35 !important;
+          }
+
+          .betzone-page [class*="text-xl"] {
+            font-size: 1.125rem !important;
+            line-height: 1.35 !important;
+          }
+
+          .betzone-page [class*="text-lg"] {
+            font-size: 1rem !important;
+            line-height: 1.35 !important;
+          }
+
+          .betzone-page [class*="text-sm"] {
+            font-size: 0.8125rem !important;
+            line-height: 1.3 !important;
+          }
+
+          .betzone-page [class*="text-base"] {
+            font-size: 0.875rem !important;
+            line-height: 1.35 !important;
+          }
+        }
+      `}</style>
+
       {/* PREMIUM MOBILE BOTTOM NAVIGATION */}
       <nav className="fixed inset-x-0 bottom-0 z-[55] border-t border-gray-200 bg-[#071b34]/[0.98] px-2 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-2 shadow-[0_-8px_30px_rgba(7,27,52,0.10)] backdrop-blur lg:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
@@ -4548,7 +4608,7 @@ export default function Home() {
               active: betSlipTab === "betslip" && betSlip.length > 0,
               action: () => {
                 setBetSlipTab("betslip");
-                document.getElementById("mobile-betslip")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                setMobileBetSlipOpen(true);
               },
             },
             {
@@ -4557,7 +4617,7 @@ export default function Home() {
               active: betSlipTab === "cashout",
               action: () => {
                 setBetSlipTab("cashout");
-                document.getElementById("mobile-betslip")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                setMobileBetSlipOpen(true);
               },
             },
             {
