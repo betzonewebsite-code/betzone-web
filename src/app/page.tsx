@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -64,6 +63,39 @@ type BetSelection = {
   market: string;
 };
 
+type BetRecord = {
+  id?: string | number;
+  bet_reference?: string;
+  bet_type?: string;
+  status?: string;
+  created_at?: string;
+  placed_at?: string;
+  updated_at?: string;
+  stake?: string | number;
+  total_odds?: string | number;
+  odds?: string | number;
+  potential_payout?: string | number;
+  potential_win?: string | number;
+  payout?: string | number;
+  winnings?: string | number;
+  match_id?: string | number;
+  matchId?: string | number;
+  odd_id?: string | number;
+  oddId?: string | number;
+  home_team?: string;
+  homeTeam?: string;
+  away_team?: string;
+  awayTeam?: string;
+  selection?: string;
+  outcome?: string;
+  result?: string;
+  price?: string | number;
+  market?: string;
+  selections?: BetRecord[];
+  bet_selections?: BetRecord[];
+  [key: string]: unknown;
+};
+
 type CurrentUser = {
   id: string;
   email: string;
@@ -75,7 +107,14 @@ type Wallet = {
   balance: string | number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+type BetSubmission = {
+  bet_reference: string;
+  stake: string | number;
+  total_odds: string | number;
+  potential_return: string | number;
+};
+
+const API_URL = "http://localhost:4000";
 const TOKEN_KEY = "betzone_access_token";
 const USER_KEY = "betzone_user";
 
@@ -96,17 +135,16 @@ export default function Home() {
   const [betSlip, setBetSlip] = useState<BetSelection[]>([]);
   const [betSlipTab, setBetSlipTab] = useState<"betslip" | "cashout">("betslip");
   const [myBetFilter, setMyBetFilter] = useState<"open" | "settled">("open");
-  const [myBets, setMyBets] = useState<any[]>([]);
+  const [myBets, setMyBets] = useState<BetRecord[]>([]);
   const [myBetsLoading, setMyBetsLoading] = useState(false);
   const [myBetsError, setMyBetsError] = useState("");
-  const [expandedMyBet, setExpandedMyBet] = useState<string | null>(null);
+  const [selectedMyBet, setSelectedMyBet] = useState<BetRecord | null>(null);
   const [betSlipMode, setBetSlipMode] = useState<"real" | "sim">("real");
   const [betType, setBetType] = useState<
     "single" | "accumulator"
   >("single");
   const [stake, setStake] = useState("");
 
-  const [loadingSports, setLoadingSports] = useState(true);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [error, setError] = useState("");
 
@@ -121,7 +159,7 @@ export default function Home() {
   const [loadBetLoading, setLoadBetLoading] =
     useState(false);
   const [loadedBet, setLoadedBet] =
-    useState<any | null>(null);
+    useState<BetRecord | null>(null);
   const [loadBetError, setLoadBetError] =
     useState("");
   const [loadBetSuccess, setLoadBetSuccess] =
@@ -132,6 +170,24 @@ export default function Home() {
     useState<CurrentUser | null>(null);
   const [wallet, setWallet] =
     useState<Wallet | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedReference = params.get("loadBet")?.trim().toUpperCase();
+
+    if (!sharedReference) return;
+
+    setLoadBetReference(sharedReference);
+    setLoadBetError("");
+    setLoadBetSuccess("");
+    setLoadedBet(null);
+    setLoadBetOpen(true);
+
+    params.delete("loadBet");
+    const cleanQuery = params.toString();
+    const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }, []);
+
   const [authLoading, setAuthLoading] =
     useState(true);
 
@@ -204,6 +260,78 @@ export default function Home() {
   const [betSuccess, setBetSuccess] =
     useState("");
 
+  const [betSubmission, setBetSubmission] =
+    useState<BetSubmission | null>(null);
+
+  const [betSubmissionCopied, setBetSubmissionCopied] =
+    useState(false);
+
+  const [betSubmissionShared, setBetSubmissionShared] =
+    useState(false);
+
+  async function copyBetBookingCode() {
+    if (!betSubmission?.bet_reference) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        betSubmission.bet_reference,
+      );
+      setBetSubmissionCopied(true);
+      window.setTimeout(() => {
+        setBetSubmissionCopied(false);
+      }, 1800);
+    } catch (err) {
+      console.error("Failed to copy booking code", err);
+    }
+  }
+
+  function getBetzonePublicUrl() {
+    const configuredUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+
+    if (configuredUrl) {
+      return configuredUrl;
+    }
+
+    return window.location.origin;
+  }
+
+  function getLoadBetUrl(reference: string) {
+    return `${getBetzonePublicUrl()}/?loadBet=${encodeURIComponent(reference)}`;
+  }
+
+  async function shareBetBookingCode() {
+    if (!betSubmission?.bet_reference) return;
+
+    const reference = betSubmission.bet_reference;
+    const loadBetUrl = getLoadBetUrl(reference);
+    const shareText = `BETZONE Booking Code: ${reference}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "BETZONE Bet",
+          text: shareText,
+          url: loadBetUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(
+          `${shareText}\nLoad this bet in BETZONE: ${loadBetUrl}`,
+        );
+      }
+      setBetSubmissionShared(true);
+      window.setTimeout(() => {
+        setBetSubmissionShared(false);
+      }, 1800);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+      console.error("Failed to share booking code", err);
+    }
+  }
   async function loadCurrentUser(token: string) {
     try {
       const response = await fetch(
@@ -362,6 +490,12 @@ export default function Home() {
     setTransactionNote("");
     setTransactionError("");
     setTransactionSuccess("");
+  }
+
+  function formatMoney(value: number | string | null | undefined) {
+    const amount = Number(value ?? 0);
+
+    return amount.toFixed(2);
   }
 
   function formatBalance(
@@ -555,7 +689,6 @@ export default function Home() {
   useEffect(() => {
     async function loadSports() {
       try {
-        setLoadingSports(true);
         setError("");
 
         const response = await fetch(
@@ -593,7 +726,6 @@ export default function Home() {
           "Unable to connect to BETZONE API.",
         );
       } finally {
-        setLoadingSports(false);
       }
     }
 
@@ -920,6 +1052,42 @@ export default function Home() {
     return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
   }
 
+  async function copyMyBetBookingCode(reference: string) {
+    if (!reference) return;
+
+    try {
+      await navigator.clipboard.writeText(reference);
+    } catch (err) {
+      console.error("Failed to copy My Bet booking code", err);
+    }
+  }
+
+  async function shareMyBetBookingCode(reference: string) {
+    if (!reference) return;
+
+    const loadBetUrl = getLoadBetUrl(reference);
+    const shareText = `BETZONE Booking Code: ${reference}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "BETZONE Bet",
+          text: shareText,
+          url: loadBetUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(
+          `${shareText}\nLoad this bet in BETZONE: ${loadBetUrl}`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+      console.error("Failed to share My Bet booking code", err);
+    }
+  }
+
   function get1X2Odds(match: Match) {
     const matchOdds =
       oddsByMatch[match.id] ?? [];
@@ -1016,26 +1184,15 @@ export default function Home() {
     return result;
   }
 
-  const playableMatches = useMemo(
-    () => {
-      return matches.filter(
-        (match) => {
-          const matchOdds =
-            get1X2Odds(match);
+  const playableMatches = matches.filter((match) => {
+    const matchOdds = get1X2Odds(match);
 
-          return (
-            matchOdds.home !==
-              null ||
-            matchOdds.draw !==
-              null ||
-            matchOdds.away !==
-              null
-          );
-        },
-      );
-    },
-    [matches, oddsByMatch],
-  );
+    return (
+      matchOdds.home !== null ||
+      matchOdds.draw !== null ||
+      matchOdds.away !== null
+    );
+  });
 
   function toggleBet(
     match: Match,
@@ -1082,10 +1239,9 @@ export default function Home() {
         awayTeam: match.away_team,
         selection: odd.selection,
         odds: numericOdds,
-        market:
-          odd.sports_markets
-            ?.market_key ??
-          odd.market,
+        // The betting API validates against sports_odds.market exactly.
+        // Do not replace it with sports_markets.market_key.
+        market: odd.market,
       },
     ]);
   }
@@ -1331,13 +1487,18 @@ export default function Home() {
       return;
     }
 
+    if (authLoading) {
+      setBetError("Please wait while BETZONE checks your account.");
+      return;
+    }
+
     const token =
       localStorage.getItem(
         TOKEN_KEY,
       );
 
-    if (!token) {
-      setAuthError("");
+    if (!token || !user) {
+      setAuthError("Please log in or register before placing a bet.");
       setAuthMode("login");
       return;
     }
@@ -1345,6 +1506,39 @@ export default function Home() {
     setBetSubmitting(true);
 
     try {
+      // Build the payload from the exact active odd currently held by the
+      // frontend. The database place_bet function requires odd_id, match_id,
+      // market and selection to match the sports_odds row exactly.
+      const currentOdds = [
+        ...odds,
+        ...footballQuickOdds,
+      ];
+
+      const betSelections = betSlip.map((selected) => {
+        const currentOdd = currentOdds.find(
+          (odd) => odd.id === selected.oddId,
+        );
+
+        if (!currentOdd) {
+          throw new Error(
+            "One of your selected odds is no longer available. Please refresh the page and select the odds again.",
+          );
+        }
+
+        if (!currentOdd.is_active) {
+          throw new Error(
+            "One of your selected odds is no longer available. Please refresh the page and select the odds again.",
+          );
+        }
+
+        return {
+          odd_id: currentOdd.id,
+          match_id: currentOdd.match_id,
+          market: currentOdd.market,
+          selection: currentOdd.selection,
+        };
+      });
+
       const response =
         await fetch(
           `${API_URL}/bets`,
@@ -1358,19 +1552,7 @@ export default function Home() {
             body: JSON.stringify({
               betType,
               stake: numericStake,
-              selections:
-                betSlip.map(
-                  (selection) => ({
-                    odd_id:
-                      selection.oddId,
-                    match_id:
-                      selection.matchId,
-                    market:
-                      selection.market,
-                    selection:
-                      selection.selection,
-                  }),
-                ),
+              selections: betSelections,
             }),
           },
         );
@@ -1412,9 +1594,38 @@ export default function Home() {
         );
       }
 
+      const submission = data?.data ?? data ?? {};
+
+      const bookingCode =
+        submission?.bet_reference ??
+        submission?.booking_code ??
+        "";
+
+      const submittedStake =
+        submission?.stake ??
+        numericStake;
+
+      const submittedTotalOdds =
+        submission?.total_odds ??
+        combinedOdds;
+
+      const submittedPotentialReturn =
+        submission?.potential_return ??
+        submission?.potential_win ??
+        potentialPayout;
+
+      if (bookingCode) {
+        setBetSubmission({
+          bet_reference: String(bookingCode),
+          stake: submittedStake,
+          total_odds: submittedTotalOdds,
+          potential_return: submittedPotentialReturn,
+        });
+      }
+
       setBetSuccess(
-        data?.bet_reference
-          ? `Bet ${data.bet_reference} placed successfully.`
+        bookingCode
+          ? `Bet ${bookingCode} placed successfully.`
           : "Your bet was placed successfully.",
       );
 
@@ -1514,7 +1725,7 @@ export default function Home() {
     }
   }
 
-  function addLoadedBetToBetslip(betToLoad: any = loadedBet): boolean {
+  function addLoadedBetToBetslip(betToLoad: BetRecord | null = loadedBet): boolean {
     if (!betToLoad?.selections?.length) {
       setLoadBetError("This bet has no selections to load.");
       return false;
@@ -1570,7 +1781,6 @@ export default function Home() {
         odds: numericOdds,
         market: String(
           item.market ??
-          currentOdd?.sports_markets?.market_key ??
           currentOdd?.market ??
           "h2h",
         ),
@@ -1872,27 +2082,20 @@ export default function Home() {
                         ["X", drawOdd],
                         ["2", awayOdd],
                       ].map((item) => {
-                        const label = String(item[0]);
-                        const odd = item[1];
+                        const label = item[0] as string;
+                        const odd = item[1] as Odd | null;
+
                         return (
-                          <button
-                            key={label}
-                            type="button"
-                            disabled={!odd || typeof odd === "string"}
-                            onClick={() =>
-                              odd && typeof odd !== "string"
-                                ? toggleBet(match, odd)
-                                : undefined
-                            }
-                            className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-center transition hover:border-[#071b34] disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <span className="block text-[9px] font-bold text-gray-400">{label}</span>
-                            <span className="mt-0.5 block text-xs font-black text-[#071b34]">
-                              {odd && typeof odd !== "string"
-                                ? Number(odd.odds).toFixed(2)
-                                : "-"}
-                            </span>
-                          </button>
+                        <button
+                          key={label as string}
+                          type="button"
+                          disabled={!odd}
+                          onClick={() => odd && toggleBet(match, odd as Odd)}
+                          className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-center transition hover:border-[#071b34] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <span className="block text-[9px] font-bold text-gray-400">{label}</span>
+                          <span className="mt-0.5 block text-xs font-black text-[#071b34]">{odd ? Number((odd as Odd).odds).toFixed(2) : "-"}</span>
+                        </button>
                         );
                       })}
                     </div>
@@ -2416,69 +2619,71 @@ export default function Home() {
                 <div className="space-y-3">
                   {(myBetFilter === "open" ? myOpenBets : mySettledBets).map((bet) => {
                     const status = String(bet.status || "open").toUpperCase();
-                    const selections = Array.isArray(bet.bet_selections) ? bet.bet_selections : Array.isArray(bet.selections) ? bet.selections : [];
                     const totalOdds = Number(bet.total_odds ?? bet.odds ?? 0);
                     const stakeValue = Number(bet.stake ?? 0);
-                    const storedPayout = Number(
-                      bet.potential_payout ??
+                    const potentialWin = Number(
+                      bet.potential_return ??
                         bet.potential_win ??
-                        bet.payout ??
-                        bet.winnings ??
+                        bet.potential_payout ??
                         0,
                     );
-                    const payout =
-                      status === "WON" &&
-                      storedPayout <= 0 &&
-                      stakeValue > 0 &&
-                      totalOdds > 0
-                        ? stakeValue * totalOdds
-                        : storedPayout;
-                    const betId = String(bet.id ?? bet.bet_reference ?? Math.random());
+                    const betId = String(bet.id ?? bet.bet_reference ?? "bet");
+                    const bookingCode = String(bet.bet_reference ?? "");
+
                     return (
-                      <div key={betId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                      <div
+                        key={betId}
+                        className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="truncate text-xs font-black text-[#071b34]">
-                              {bet.bet_reference || betId}
+                              {bookingCode || betId}
                             </div>
                             <div className="mt-1 text-[10px] text-gray-400">
                               {bet.bet_type || "Bet"} · {formatMyBetDate(bet.created_at || bet.placed_at || bet.updated_at)}
                             </div>
                           </div>
-                          <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${status === "WON" ? "bg-green-100 text-green-700" : status === "LOST" ? "bg-red-100 text-red-700" : status === "OPEN" || status === "PENDING" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${
+                              status === "WON"
+                                ? "bg-green-100 text-green-700"
+                                : status === "LOST"
+                                  ? "bg-red-100 text-red-700"
+                                  : status === "OPEN" || status === "PENDING"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
                             {status}
                           </span>
                         </div>
 
                         <div className="mt-3 grid grid-cols-3 gap-2 border-y border-gray-100 py-3">
-                          <div><div className="text-[9px] uppercase tracking-wide text-gray-400">Stake</div><div className="mt-1 text-xs font-black">GHS {stakeValue.toFixed(2)}</div></div>
-                          <div><div className="text-[9px] uppercase tracking-wide text-gray-400">Odds</div><div className="mt-1 text-xs font-black">{totalOdds > 0 ? totalOdds.toFixed(2) : "-"}</div></div>
-                          <div><div className="text-[9px] uppercase tracking-wide text-gray-400">Return</div><div className="mt-1 text-xs font-black text-[#1b9b52]">GHS {payout > 0 ? payout.toFixed(2) : "0.00"}</div></div>
+                          <div>
+                            <div className="text-[9px] uppercase tracking-wide text-gray-400">Stake</div>
+                            <div className="mt-1 text-xs font-black">GHS {stakeValue.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] uppercase tracking-wide text-gray-400">Odds</div>
+                            <div className="mt-1 text-xs font-black">{totalOdds > 0 ? totalOdds.toFixed(2) : "-"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] uppercase tracking-wide text-gray-400">Pot. Win</div>
+                            <div className="mt-1 text-xs font-black text-[#1b9b52]">GHS {potentialWin > 0 ? potentialWin.toFixed(2) : "0.00"}</div>
+                          </div>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => setExpandedMyBet(expandedMyBet === betId ? null : betId)}
-                          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black text-[#071b34]"
+                          onClick={() => {
+                            setSelectedMyBet(bet);
+                          }}
+                          className="mt-3 w-full rounded-lg bg-[#071b34] px-3 py-2.5 text-[10px] font-black text-white transition hover:bg-[#102c50]"
                         >
-                          {expandedMyBet === betId ? "Hide Selections" : `View ${selections.length} Selection${selections.length === 1 ? "" : "s"}`}
+                          View Ticket Details
                         </button>
 
-                        {expandedMyBet === betId && (
-                          <div className="mt-2 space-y-2">
-                            {selections.length > 0 ? selections.map((selection: any, index: number) => (
-                              <div key={String(selection.id ?? index)} className="rounded-lg bg-gray-50 p-3">
-                                <div className="text-xs font-black text-gray-800">{selection.selection || selection.outcome || "Selection"}</div>
-                                <div className="mt-1 text-[10px] text-gray-500">
-                                  Odds {Number(selection.odds ?? selection.price ?? 0) > 0 ? Number(selection.odds ?? selection.price).toFixed(2) : "-"}
-                                  {selection.result ? ` · ${selection.result}` : " · Pending"}
-                                </div>
-                              </div>
-                            )) : (
-                              <div className="rounded-lg bg-gray-50 p-3 text-[10px] text-gray-500">Selection details are not available for this bet.</div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -2778,7 +2983,7 @@ export default function Home() {
                     Load Bet
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-white/60">
-                    Enter a bet reference to load another customer's selections into your betslip.
+                    Enter a bet reference to load another customer&apos;s selections into your betslip.
                   </p>
                 </div>
 
@@ -2894,7 +3099,7 @@ export default function Home() {
 
                     <div className="space-y-2">
                       {(loadedBet.selections ?? []).map(
-                        (item: any, index: number) => {
+                        (item: BetRecord, index: number) => {
                           const match = matches.find(
                             (currentMatch) =>
                               currentMatch.id ===
@@ -2928,7 +3133,7 @@ export default function Home() {
 
                   <button
                     type="button"
-                    onClick={addLoadedBetToBetslip}
+                    onClick={() => addLoadedBetToBetslip()}
                     className="mt-4 w-full rounded-xl bg-[#071b34] py-3.5 text-sm font-black text-white transition hover:bg-[#102c50]"
                   >
                     Load into my Betslip
@@ -3776,6 +3981,330 @@ export default function Home() {
                     : "Submit Withdrawal"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MY BET TICKET DETAILS */}
+      {selectedMyBet && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 p-4"
+          onClick={() => setSelectedMyBet(null)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {(() => {
+              const ticketStatus = String(selectedMyBet.status || "open").toUpperCase();
+              const ticketSelections = Array.isArray(selectedMyBet.bet_selections)
+                ? selectedMyBet.bet_selections
+                : Array.isArray(selectedMyBet.selections)
+                  ? selectedMyBet.selections
+                  : [];
+              const ticketStake = Number(selectedMyBet.stake ?? 0);
+              const ticketOdds = Number(selectedMyBet.total_odds ?? selectedMyBet.odds ?? 0);
+              const ticketPotentialWin = Number(
+                selectedMyBet.potential_return ??
+                  selectedMyBet.potential_win ??
+                  selectedMyBet.potential_payout ??
+                  0,
+              );
+              const ticketReturn = Number(
+                selectedMyBet.payout ?? selectedMyBet.winnings ?? 0,
+              );
+              const ticketReference = String(selectedMyBet.bet_reference ?? "");
+              const ticketIsSettled = !["open", "pending", "active", "unsettled"].includes(
+                ticketStatus.toLowerCase(),
+              );
+              const ticketResult = ticketStatus === "WON"
+                ? "WON"
+                : ticketStatus === "LOST"
+                  ? "LOST"
+                  : ticketStatus === "VOID" || ticketStatus === "CANCELLED"
+                    ? "VOID"
+                    : ticketStatus;
+
+              return (
+                <>
+                  <div className="bg-[#071b34] px-5 py-5 text-white sm:px-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#f5b400]">
+                          BETZONE
+                        </p>
+                        <h2 className="mt-1 text-xl font-black">Ticket Details</h2>
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          ID: {String(selectedMyBet.id ?? ticketReference ?? "-")}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMyBet(null)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white hover:bg-white/15"
+                        aria-label="Close ticket details"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400">
+                          {formatMyBetDate(selectedMyBet.created_at || selectedMyBet.placed_at || selectedMyBet.updated_at)}
+                        </p>
+                        <p className="mt-1 text-xs font-black uppercase text-[#071b34]">
+                          {selectedMyBet.bet_type || "Bet"}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${
+                        ticketStatus === "WON"
+                          ? "bg-green-100 text-green-700"
+                          : ticketStatus === "LOST"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {ticketStatus}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      {[
+                        ["Total Stake", `GHS ${ticketStake.toFixed(2)}`],
+                        ["Total Odds", ticketOdds > 0 ? ticketOdds.toFixed(2) : "-"],
+                        ["Pot. Win", `GHS ${ticketPotentialWin.toFixed(2)}`],
+                        ["Total Return", ticketIsSettled ? `GHS ${ticketReturn.toFixed(2)}` : "--"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-2xl bg-gray-50 p-3.5">
+                          <p className="text-[9px] font-black uppercase tracking-wide text-gray-400">{label}</p>
+                          <p className="mt-1 text-sm font-black text-[#071b34]">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {ticketIsSettled && (
+                      <div className={`mt-4 rounded-2xl border p-4 ${
+                        ticketResult === "WON"
+                          ? "border-green-200 bg-green-50"
+                          : ticketResult === "LOST"
+                            ? "border-red-200 bg-red-50"
+                            : "border-gray-200 bg-gray-50"
+                      }`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500">Settlement Result</p>
+                            <p className={`mt-1 text-lg font-black ${
+                              ticketResult === "WON" ? "text-green-700" : ticketResult === "LOST" ? "text-red-700" : "text-gray-700"
+                            }`}>
+                              {ticketResult}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[9px] font-black uppercase tracking-wide text-gray-400">Return</p>
+                            <p className="mt-1 text-sm font-black text-[#071b34]">GHS {ticketReturn.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4 rounded-2xl border border-[#f5b400]/40 bg-[#fffaf0] p-4">
+                      <p className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-gray-500">Booking Code</p>
+                      <p className="mt-2 break-all text-center text-xl font-black tracking-[0.12em] text-[#071b34]">
+                        {ticketReference || "-"}
+                      </p>
+                      {ticketReference && (
+                        <div className="mt-3 flex justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void copyMyBetBookingCode(ticketReference)}
+                            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-[10px] font-black text-[#071b34]"
+                          >
+                            ⧉ Copy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void shareMyBetBookingCode(ticketReference)}
+                            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-[10px] font-black text-[#071b34]"
+                          >
+                            ↗ Share
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-5">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-black text-[#071b34]">Selections</h3>
+                        <span className="text-[10px] font-bold text-gray-400">
+                          {ticketSelections.length} selection{ticketSelections.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 space-y-3">
+                        {ticketSelections.length > 0 ? ticketSelections.map((selection: BetRecord, index: number) => (
+                          <div key={String(selection.id ?? index)} className="rounded-2xl border border-gray-200 bg-white p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[9px] font-black uppercase tracking-wide text-gray-400">Game ID</p>
+                                <p className="mt-1 break-all text-[10px] font-bold text-gray-600">{String(selection.match_id ?? selection.matchId ?? "-")}</p>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[9px] font-black text-gray-600">
+                                {String(selection.result || "pending").toUpperCase()}
+                              </span>
+                            </div>
+
+                            <p className="mt-3 text-xs font-black text-[#071b34]">
+                              {selection.home_team || selection.homeTeam || "Home"}
+                              <span className="px-1.5 text-gray-400">vs</span>
+                              {selection.away_team || selection.awayTeam || "Away"}
+                            </p>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 border-t border-gray-100 pt-3">
+                              <div>
+                                <p className="text-[9px] uppercase tracking-wide text-gray-400">Pick</p>
+                                <p className="mt-1 text-[10px] font-black text-gray-800">{selection.selection || selection.outcome || "-"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase tracking-wide text-gray-400">Market</p>
+                                <p className="mt-1 text-[10px] font-black text-gray-800">{selection.market || "-"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase tracking-wide text-gray-400">Odds</p>
+                                <p className="mt-1 text-[10px] font-black text-gray-800">{Number(selection.odds ?? selection.price ?? 0) > 0 ? Number(selection.odds ?? selection.price).toFixed(2) : "-"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase tracking-wide text-gray-400">Result</p>
+                                <p className={`mt-1 text-[10px] font-black ${
+                                  ticketIsSettled && String(selection.match_result_status || selection.result || "pending").toLowerCase() === "won"
+                                    ? "text-green-600"
+                                    : ticketIsSettled && String(selection.match_result_status || selection.result || "pending").toLowerCase() === "lost"
+                                      ? "text-red-600"
+                                      : "text-gray-700"
+                                }`}>
+                                  {ticketIsSettled
+                                    ? String(selection.match_result_status || selection.result || "pending").toUpperCase()
+                                    : "PENDING"}
+                                </p>
+                              </div>
+                            </div>
+
+                            {ticketIsSettled && (selection.match_status || selection.home_score != null || selection.away_score != null) && (
+                              <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-[10px] font-semibold text-gray-500">
+                                Match status: {String(selection.match_status || "finished")}
+                                {selection.home_score != null || selection.away_score != null
+                                  ? ` · Final score ${selection.home_score ?? "-"}-${selection.away_score ?? "-"}`
+                                  : ""}
+                              </div>
+                            )}
+                          </div>
+                        )) : (
+                          <div className="rounded-xl bg-gray-50 p-4 text-center text-[10px] text-gray-500">
+                            Selection details are not available for this ticket.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMyBet(null)}
+                      className="mt-5 w-full rounded-xl bg-[#f5b400] py-3 text-xs font-black text-[#071b34]"
+                    >
+                      Close Ticket
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* BET SUBMISSION SUCCESS */}
+      {betSubmission && (
+        <div
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/65 p-4"
+          onClick={() => setBetSubmission(null)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="bg-[#071b34] px-6 py-7 text-white sm:px-8">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f5b400] text-2xl font-black text-[#071b34]">
+                ✓
+              </div>
+
+              <h2 className="mt-4 text-center text-2xl font-black">
+                Submission Successful
+              </h2>
+
+              <p className="mt-2 text-center text-xs font-medium leading-5 text-slate-300">
+                Your bet has been accepted and your booking code is ready.
+              </p>
+            </div>
+
+            <div className="p-6 sm:p-8">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">
+                    Total Stake
+                  </p>
+                  <p className="mt-1 text-xl font-black text-[#071b34]">
+                    {formatMoney(betSubmission.stake)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">
+                    Potential Win
+                  </p>
+                  <p className="mt-1 text-xl font-black text-[#071b34]">
+                    {formatMoney(betSubmission.potential_return)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-[#f5b400]/40 bg-[#fffaf0] p-5">
+                <p className="text-center text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                  Booking Code
+                </p>
+
+                <p className="mt-2 text-center text-2xl font-black tracking-[0.16em] text-[#071b34]">
+                  {betSubmission.bet_reference}
+                </p>
+
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyBetBookingCode}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-[#071b34] shadow-sm transition hover:bg-slate-50"
+                  >
+                    <span aria-hidden="true">⧉</span>
+                    {betSubmissionCopied ? "Copied" : "Copy"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={shareBetBookingCode}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-[#071b34] shadow-sm transition hover:bg-slate-50"
+                  >
+                    <span aria-hidden="true">↗</span>
+                    {betSubmissionShared ? "Shared" : "Share"}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBetSubmission(null)}
+                className="mt-5 w-full rounded-xl bg-[#f5b400] py-3.5 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b]"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
