@@ -1821,12 +1821,12 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f6f8]">
+    <main className="min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-[#071b34] text-white shadow-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3">
           <div>
-            <div className="text-2xl font-black tracking-tight">
+            <div className="text-xl font-black tracking-tight sm:text-2xl">
               BETZONE
             </div>
 
@@ -1980,8 +1980,76 @@ export default function Home() {
         </div>
       </header>
 
+      {/* PREMIUM MOBILE NAVIGATION */}
+      <section className="border-b border-[#e7ebef] bg-white lg:hidden">
+        <div className="px-3 pt-2.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSport("football");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-black transition ${
+                selectedSport === "football"
+                  ? "bg-[#071b34] text-white shadow-sm"
+                  : "bg-[#f4f6f8] text-gray-600"
+              }`}
+            >
+              ⚽ Football
+            </button>
+            {sports
+              .filter((sport) => sport.sport_key !== "football")
+              .slice(0, 5)
+              .map((sport) => (
+                <button
+                  key={sport.id}
+                  type="button"
+                  onClick={() => setSelectedSport(sport.sport_key)}
+                  className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-black transition ${
+                    selectedSport === sport.sport_key
+                      ? "bg-[#071b34] text-white shadow-sm"
+                      : "bg-[#f4f6f8] text-gray-600"
+                  }`}
+                >
+                  {sport.sport_name}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setSportsMenuOpen((open) => !open)}
+              className="shrink-0 rounded-full border border-[#f5b400]/40 bg-[#fff9df] px-4 py-2 text-[11px] font-black text-[#071b34]"
+            >
+              More ▾
+            </button>
+          </div>
+
+          {sportsMenuOpen && (
+            <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
+              {sports.map((sport) => (
+                <button
+                  key={sport.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSport(sport.sport_key);
+                    setSportsMenuOpen(false);
+                  }}
+                  className={`rounded-xl px-3 py-3 text-left text-[11px] font-black ${
+                    selectedSport === sport.sport_key
+                      ? "bg-[#071b34] text-white"
+                      : "bg-[#f6f7f9] text-gray-700"
+                  }`}
+                >
+                  {sport.sport_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* SPORTS */}
-      <section className="border-b border-gray-200 bg-white">
+      <section className="hidden border-b border-gray-200 bg-white lg:block">
         <div className="mx-auto max-w-7xl px-4 py-3">
           <div className="relative">
             <button
@@ -2114,9 +2182,9 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[220px_minmax(0,1fr)_380px]">
+      <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 sm:py-6 lg:gap-6 lg:grid-cols-[220px_minmax(0,1fr)_380px]">
         {/* LEAGUES */}
-        <aside className="h-fit overflow-hidden rounded-2xl bg-white shadow-sm lg:sticky lg:top-20">
+        <aside className="hidden h-fit overflow-hidden rounded-2xl bg-white shadow-sm lg:sticky lg:top-20 lg:block">
           <div className="border-b border-gray-200 bg-[#071b34] px-4 py-3">
             <h2 className="text-sm font-black uppercase tracking-wide text-white">
               Popular
@@ -2150,12 +2218,12 @@ export default function Home() {
 
         {/* MAIN */}
         <section className="min-w-0">
-          <div className="mb-5 overflow-hidden rounded-2xl bg-[#071b34] p-6 text-white shadow-sm sm:p-7">
+          <div className="mb-4 overflow-hidden rounded-2xl bg-[#071b34] p-4 text-white shadow-sm sm:mb-5 sm:p-7">
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#f5b400]">
               Welcome to BETZONE
             </p>
 
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
+            <h1 className="text-2xl font-black tracking-tight sm:text-4xl">
               Bet on the action.
             </h1>
 
@@ -2300,7 +2368,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="p-4 sm:p-5">
+                      <div className="p-3 sm:p-5">
                         <div className="grid gap-4 lg:grid-cols-[minmax(210px,1fr)_minmax(360px,1.6fr)_auto] lg:items-center">
                           <button
                             onClick={() =>
@@ -2491,7 +2559,7 @@ export default function Home() {
         </section>
 
         {/* BET SLIP */}
-        <aside className="h-fit overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg lg:sticky lg:top-20">
+        <aside id="mobile-betslip" className="h-fit overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg lg:sticky lg:top-20">
           {/* BETSLIP / CASHOUT TABS */}
           <div className="border-b border-gray-200 bg-[#071b34] px-3 pt-2">
             <div className="grid grid-cols-2">
@@ -4458,6 +4526,70 @@ export default function Home() {
           </div>
         </div>
       )}
+      {/* PREMIUM MOBILE BOTTOM NAVIGATION */}
+      <nav className="fixed inset-x-0 bottom-0 z-[55] border-t border-gray-200 bg-[#071b34]/[0.98] px-2 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-2 shadow-[0_-8px_30px_rgba(7,27,52,0.10)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          {[
+            {
+              label: "Home",
+              icon: "⌂",
+              active: false,
+              action: () => window.scrollTo({ top: 0, behavior: "smooth" }),
+            },
+            {
+              label: "Sports",
+              icon: "⚽",
+              active: true,
+              action: () => window.scrollTo({ top: 0, behavior: "smooth" }),
+            },
+            {
+              label: "Betslip",
+              icon: "▣",
+              active: betSlipTab === "betslip" && betSlip.length > 0,
+              action: () => {
+                setBetSlipTab("betslip");
+                document.getElementById("mobile-betslip")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              },
+            },
+            {
+              label: "My Bets",
+              icon: "✓",
+              active: betSlipTab === "cashout",
+              action: () => {
+                setBetSlipTab("cashout");
+                document.getElementById("mobile-betslip")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              },
+            },
+            {
+              label: "Account",
+              icon: "●",
+              active: accountOpen,
+              action: () => setAccountOpen((current) => !current),
+            },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              className={`relative flex min-w-0 flex-col items-center justify-center rounded-xl py-1.5 text-[9px] font-black transition ${
+                item.active ? "text-white" : "text-white/45"
+              }`}
+            >
+              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
+                item.active ? "bg-[#f5b400] text-[#071b34]" : "bg-white/10"
+              }`}>
+                {item.icon}
+              </span>
+              <span className="mt-0.5 truncate">{item.label}</span>
+              {item.label === "Betslip" && betSlip.length > 0 && (
+                <span className="absolute right-[calc(50%-20px)] top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f5b400] px-1 text-[8px] font-black text-[#071b34]">
+                  {betSlip.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }
