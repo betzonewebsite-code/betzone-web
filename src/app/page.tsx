@@ -114,7 +114,8 @@ type BetSubmission = {
   potential_return: string | number;
 };
 
-const API_URL = "http://localhost:4000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const TOKEN_KEY = "betzone_access_token";
 const USER_KEY = "betzone_user";
 
