@@ -108,6 +108,15 @@ type Wallet = {
   balance: string | number;
 };
 
+type CustomerSettings = {
+  manual_deposit_enabled: boolean;
+  manual_deposit_provider: string;
+  manual_deposit_account_name: string;
+  manual_deposit_phone_number: string;
+  manual_deposit_instructions: string;
+};
+
+
 type BetSubmission = {
   bet_reference: string;
   stake: string | number;
@@ -173,6 +182,11 @@ export default function Home() {
     useState<CurrentUser | null>(null);
   const [wallet, setWallet] =
     useState<Wallet | null>(null);
+
+  const [customerSettings, setCustomerSettings] =
+    useState<CustomerSettings | null>(null);
+  const [customerSettingsLoading, setCustomerSettingsLoading] =
+    useState(true);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedReference = params.get("loadBet")?.trim().toUpperCase();
@@ -382,6 +396,51 @@ export default function Home() {
       );
     }
   }
+
+  useEffect(() => {
+    async function loadCustomerSettings() {
+      try {
+        const response = await fetch(
+          `${API_URL}/customer-settings`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok || !data?.success || !data?.data) {
+          throw new Error(
+            data?.message ||
+              data?.error ||
+              "Unable to load customer settings.",
+          );
+        }
+
+        setCustomerSettings({
+          manual_deposit_enabled:
+            Boolean(data.data.manual_deposit_enabled),
+          manual_deposit_provider:
+            String(data.data.manual_deposit_provider ?? "").trim(),
+          manual_deposit_account_name:
+            String(data.data.manual_deposit_account_name ?? "").trim(),
+          manual_deposit_phone_number:
+            String(data.data.manual_deposit_phone_number ?? "").trim(),
+          manual_deposit_instructions:
+            String(data.data.manual_deposit_instructions ?? "").trim(),
+        });
+      } catch (error) {
+        console.error(
+          "Failed to load BETZONE customer settings",
+          error,
+        );
+      } finally {
+        setCustomerSettingsLoading(false);
+      }
+    }
+
+    loadCustomerSettings();
+  }, []);
 
   useEffect(() => {
     async function restoreSession() {
@@ -4191,40 +4250,46 @@ export default function Home() {
                   </div>
 
                   <div className="p-4">
-                    {transactionPaymentMethod ===
-                    "MTN Mobile Money" ? (
+                    {customerSettingsLoading ? (
+                      <div className="rounded-xl bg-white/70 p-3">
+                        <p className="text-xs font-bold text-gray-500">
+                          Loading payment details...
+                        </p>
+                      </div>
+                    ) : customerSettings?.manual_deposit_enabled ? (
                       <>
                         <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                          Send to MTN Mobile Money
+                          Send to {
+                            customerSettings.manual_deposit_provider ||
+                            transactionPaymentMethod
+                          }
                         </p>
 
                         <p className="mt-2 text-2xl font-black tracking-wide text-[#071b34]">
-                          0543587828
+                          {customerSettings.manual_deposit_phone_number ||
+                            "Payment number unavailable"}
                         </p>
 
-                        <p className="mt-1 text-sm font-bold text-gray-700">
-                          Elliot Kutsoke
-                        </p>
+                        {customerSettings.manual_deposit_account_name && (
+                          <p className="mt-1 text-sm font-bold text-gray-700">
+                            {customerSettings.manual_deposit_account_name}
+                          </p>
+                        )}
                       </>
                     ) : (
-                      <>
-                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                          Send to Telecel
+                      <div className="rounded-xl bg-white/70 p-3">
+                        <p className="text-xs font-bold text-red-600">
+                          Manual deposits are currently unavailable.
                         </p>
-
-                        <p className="mt-2 text-2xl font-black tracking-wide text-[#071b34]">
-                          0507724654
-                        </p>
-
-                        <p className="mt-1 text-sm font-bold text-gray-700">
-                          Offei Wonder
-                        </p>
-                      </>
+                      </div>
                     )}
 
                     <div className="mt-4 rounded-xl bg-white/70 p-3">
                       <p className="text-xs leading-5 text-gray-600">
-                        After sending the money, enter the exact amount and your payment/reference number below. Your wallet will remain unchanged until BETZONE manually verifies and approves the deposit.
+                        {
+                          customerSettings?.manual_deposit_instructions ||
+                          "After sending the money, enter the exact amount and your payment/reference number below. Your wallet will remain unchanged until BETZONE manually verifies and approves the deposit."
+                        }
                       </p>
                     </div>
                   </div>
