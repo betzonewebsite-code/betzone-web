@@ -1878,7 +1878,8 @@ export default function Home() {
   }
 
   return (
-    <main className="betzone-page min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
+    <>
+      <main className="betzone-page min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-[#071b34] text-white shadow-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3">
@@ -3177,7 +3178,7 @@ export default function Home() {
       {/* LOAD BET */}
       {loadBetOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
           onClick={closeLoadBet}
         >
           <div
@@ -3359,6 +3360,72 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* PREMIUM MOBILE BOTTOM NAVIGATION */}
+      <nav className="fixed inset-x-0 bottom-0 z-[55] border-t border-gray-200 bg-[#071b34]/[0.98] px-2 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-2 shadow-[0_-8px_30px_rgba(7,27,52,0.10)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          {[
+            {
+              label: "Home",
+              icon: "⌂",
+              active: false,
+              action: () => window.scrollTo({ top: 0, behavior: "smooth" }),
+            },
+            {
+              label: "Sports",
+              icon: "⚽",
+              active: true,
+              action: () => window.scrollTo({ top: 0, behavior: "smooth" }),
+            },
+            {
+              label: "Betslip",
+              icon: "▣",
+              active: betSlipTab === "betslip" && betSlip.length > 0,
+              action: () => {
+                setBetSlipTab("betslip");
+                setMobileBetSlipOpen(true);
+              },
+            },
+            {
+              label: "My Bets",
+              icon: "✓",
+              active: betSlipTab === "cashout",
+              action: () => {
+                setBetSlipTab("cashout");
+                setMobileBetSlipOpen(true);
+              },
+            },
+            {
+              label: "Account",
+              icon: "●",
+              active: accountOpen,
+              action: () => setAccountOpen((current) => !current),
+            },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              className={`relative flex min-w-0 flex-col items-center justify-center rounded-xl py-1.5 text-[9px] font-black transition ${
+                item.active ? "text-white" : "text-white/45"
+              }`}
+            >
+              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
+                item.active ? "bg-[#f5b400] text-[#071b34]" : "bg-white/10"
+              }`}>
+                {item.icon}
+              </span>
+              <span className="mt-0.5 truncate">{item.label}</span>
+              {item.label === "Betslip" && betSlip.length > 0 && (
+                <span className="absolute right-[calc(50%-20px)] top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f5b400] px-1 text-[8px] font-black text-[#071b34]">
+                  {betSlip.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
+      </main>
 
       {/* MATCH DETAILS */}
       {selectedMatch && (
@@ -4701,71 +4768,6 @@ export default function Home() {
           }
         }
       `}</style>
-
-      {/* PREMIUM MOBILE BOTTOM NAVIGATION */}
-      <nav className="fixed inset-x-0 bottom-0 z-[55] border-t border-gray-200 bg-[#071b34]/[0.98] px-2 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-2 shadow-[0_-8px_30px_rgba(7,27,52,0.10)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-          {[
-            {
-              label: "Home",
-              icon: "⌂",
-              active: false,
-              action: () => window.scrollTo({ top: 0, behavior: "smooth" }),
-            },
-            {
-              label: "Sports",
-              icon: "⚽",
-              active: true,
-              action: () => window.scrollTo({ top: 0, behavior: "smooth" }),
-            },
-            {
-              label: "Betslip",
-              icon: "▣",
-              active: betSlipTab === "betslip" && betSlip.length > 0,
-              action: () => {
-                setBetSlipTab("betslip");
-                setMobileBetSlipOpen(true);
-              },
-            },
-            {
-              label: "My Bets",
-              icon: "✓",
-              active: betSlipTab === "cashout",
-              action: () => {
-                setBetSlipTab("cashout");
-                setMobileBetSlipOpen(true);
-              },
-            },
-            {
-              label: "Account",
-              icon: "●",
-              active: accountOpen,
-              action: () => setAccountOpen((current) => !current),
-            },
-          ].map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.action}
-              className={`relative flex min-w-0 flex-col items-center justify-center rounded-xl py-1.5 text-[9px] font-black transition ${
-                item.active ? "text-white" : "text-white/45"
-              }`}
-            >
-              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
-                item.active ? "bg-[#f5b400] text-[#071b34]" : "bg-white/10"
-              }`}>
-                {item.icon}
-              </span>
-              <span className="mt-0.5 truncate">{item.label}</span>
-              {item.label === "Betslip" && betSlip.length > 0 && (
-                <span className="absolute right-[calc(50%-20px)] top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f5b400] px-1 text-[8px] font-black text-[#071b34]">
-                  {betSlip.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </nav>
-    </main>
+    </>
   );
 }
