@@ -523,6 +523,10 @@ export default function AdminPage() {
   const [withdrawalsEnabled, setWithdrawalsEnabled] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
+  const [customerZoom, setCustomerZoom] = useState("75");
+  const [customerFontSize, setCustomerFontSize] = useState("normal");
+  const [customerFontFamily, setCustomerFontFamily] = useState("system");
+
   const [manualDepositEnabled, setManualDepositEnabled] = useState(true);
   const [manualDepositProvider, setManualDepositProvider] = useState("MTN Mobile Money");
   const [manualDepositAccountName, setManualDepositAccountName] = useState("BETZONE");
@@ -983,6 +987,9 @@ export default function AdminPage() {
       setDepositsEnabled(Boolean(settings.deposits_enabled));
       setWithdrawalsEnabled(Boolean(settings.withdrawals_enabled));
       setMaintenanceMode(Boolean(settings.maintenance_mode));
+      setCustomerZoom(String(settings.customer_zoom ?? "75"));
+      setCustomerFontSize(String(settings.customer_font_size ?? "normal"));
+      setCustomerFontFamily(String(settings.customer_font_family ?? "system"));
       setManualDepositEnabled(Boolean(settings.manual_deposit_enabled));
       setManualDepositProvider(
         String(settings.manual_deposit_provider ?? "MTN Mobile Money"),
@@ -1151,6 +1158,9 @@ export default function AdminPage() {
             manual_deposit_account_name: manualDepositAccountName.trim(),
             manual_deposit_phone_number: manualDepositPhoneNumber.trim(),
             manual_deposit_instructions: manualDepositInstructions.trim(),
+            customer_zoom: Number(customerZoom),
+            customer_font_size: customerFontSize,
+            customer_font_family: customerFontFamily,
           }),
         },
       );
@@ -1187,6 +1197,9 @@ export default function AdminPage() {
         setDepositsEnabled(Boolean(saved.deposits_enabled));
         setWithdrawalsEnabled(Boolean(saved.withdrawals_enabled));
         setMaintenanceMode(Boolean(saved.maintenance_mode));
+        setCustomerZoom(String(saved.customer_zoom ?? customerZoom));
+        setCustomerFontSize(String(saved.customer_font_size ?? customerFontSize));
+        setCustomerFontFamily(String(saved.customer_font_family ?? customerFontFamily));
       }
 
       await loadPlatformSettings();
@@ -6114,6 +6127,42 @@ export default function AdminPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-lg font-black text-[#071b34]">Customer Display</h4>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">Control the customer-facing BETZONE zoom and typography. These settings do not change the admin dashboard.</p>
+                    </div>
+                    <span className="rounded-full bg-[#071b34] px-3 py-1 text-[10px] font-black text-[#f5b400]">CUSTOMER UI</span>
+                  </div>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Interface Zoom
+                      <select value={customerZoom} onChange={(e) => setCustomerZoom(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]">
+                        {["50", "60", "70", "75", "80", "90", "100"].map((value) => <option key={value} value={value}>{value}%</option>)}
+                      </select>
+                    </label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Font Size
+                      <select value={customerFontSize} onChange={(e) => setCustomerFontSize(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]">
+                        <option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option><option value="extra-large">Extra Large</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Font Family
+                      <select value={customerFontFamily} onChange={(e) => setCustomerFontFamily(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]">
+                        <option value="system">System</option><option value="inter">Inter</option><option value="roboto">Roboto</option><option value="poppins">Poppins</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Preview</div>
+                    <div className="mt-3 overflow-hidden rounded-xl">
+                      <div className="rounded-xl bg-[#071b34] p-4 text-white" style={{ transform: `scale(${Number(customerZoom) / 100})`, transformOrigin: "left center", width: `${10000 / Number(customerZoom)}%` }}>
+                        <div className="text-sm font-black">BETZONE Customer Interface</div>
+                        <div className="mt-1 text-xs text-slate-300">{customerZoom}% zoom · {customerFontSize} text · {customerFontFamily} font</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h4 className="text-lg font-black text-[#071b34]">Betting Limits</h4>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Stake<input type="number" min="0" step="0.01" value={minimumStake} onChange={(e) => setMinimumStake(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
@@ -7112,11 +7161,11 @@ export default function AdminPage() {
 
       {editingMatch && (
         <div
-          className="fixed inset-0 z-[55] flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-0 sm:p-4"
           onClick={closeMatchEdit}
         >
           <div
-            className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
+            className="max-h-screen w-full max-w-3xl overflow-y-auto rounded-none bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-3xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5 sm:px-6">
