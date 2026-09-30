@@ -386,12 +386,73 @@ export default function Home() {
   useEffect(() => {
     async function restoreSession() {
       try {
+        /*
+         * Supabase email confirmation can return the customer to BETZONE
+         * with an access token in the URL hash. When that happens, use the
+         * confirmed session immediately instead of asking the customer to
+         * log in again.
+         */
+        const hash = window.location.hash.replace(/^#/, "");
+        const hashParams = new URLSearchParams(hash);
+        const confirmedAccessToken =
+          hashParams.get("access_token")?.trim();
+        const confirmedRefreshToken =
+          hashParams.get("refresh_token")?.trim();
+        const confirmationType =
+          hashParams.get("type")?.trim().toLowerCase();
+
+        if (confirmedAccessToken) {
+          localStorage.setItem(
+            TOKEN_KEY,
+            confirmedAccessToken,
+          );
+
+          if (confirmedRefreshToken) {
+            localStorage.setItem(
+              "betzone_refresh_token",
+              confirmedRefreshToken,
+            );
+          }
+
+          /* Remove authentication tokens from the visible URL. */
+          window.history.replaceState(
+            {},
+            document.title,
+            `${window.location.pathname}${window.location.search}`,
+          );
+
+          await loadCurrentUser(confirmedAccessToken);
+
+          setAuthError("");
+          setAuthMode(null);
+          setEmail("");
+          setPassword("");
+          return;
+        }
+
         const token =
           localStorage.getItem(TOKEN_KEY);
 
         if (token) {
           await loadCurrentUser(token);
+          return;
         }
+
+        if (confirmationType === "signup") {
+          /*
+           * This fallback is only used if the provider completed the
+           * confirmation without returning an access token.
+           */
+          setAuthError(
+            "Your email has been confirmed. Please log in to continue.",
+          );
+          setAuthMode("login");
+        }
+      } catch (error) {
+        console.error(
+          "Failed to restore BETZONE authentication session",
+          error,
+        );
       } finally {
         setAuthLoading(false);
       }
@@ -441,10 +502,24 @@ export default function Home() {
         data?.session?.access_token;
 
       if (!token) {
+        if (authMode === "register") {
+          /*
+           * Email confirmation is enabled. Supabase normally returns no
+           * session until the customer confirms the email. The confirmation
+           * link returns to BETZONE, where restoreSession() above consumes
+           * the returned access token and logs the customer in automatically.
+           */
+          setAuthError(
+            "Registration successful. Check your email and click Confirm Email. You will be logged in automatically.",
+          );
+          setAuthMode(null);
+          setEmail("");
+          setPassword("");
+          return;
+        }
+
         throw new Error(
-          authMode === "register"
-            ? "Registration succeeded, but no login session was returned. Please log in."
-            : "Login succeeded, but no access token was returned.",
+          "Login succeeded, but no access token was returned.",
         );
       }
 
