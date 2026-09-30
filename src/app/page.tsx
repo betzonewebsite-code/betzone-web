@@ -1418,33 +1418,88 @@ export default function Home() {
   function getMatchMarkets(
     match: Match,
   ) {
-    const matchOdds =
-      oddsByMatch[match.id] ?? [];
+    const loadedOdds = [
+      ...(oddsByMatch[match.id] ?? []),
+      ...footballQuickOdds.filter(
+        (odd) => odd.match_id === match.id,
+      ),
+    ];
 
-    const activeOdds =
-      matchOdds.filter(
-        (odd) => odd.is_active,
-      );
+    const uniqueLoadedOdds = Array.from(
+      new Map(
+        loadedOdds.map((odd) => [odd.id, odd]),
+      ).values(),
+    );
 
-    const grouped: Record<
-      string,
-      Odd[]
-    > = {};
+    const activeOdds = uniqueLoadedOdds.filter(
+      (odd) => odd.is_active,
+    );
+
+    const grouped: Record<string, Odd[]> = {};
 
     for (const odd of activeOdds) {
-      const marketKey =
-        odd.sports_markets
-          ?.market_key ??
+      const rawMarketKey =
+        odd.sports_markets?.market_key ??
         odd.market ??
         "other";
+
+      // h2h and 1x2 are the same three-way football market.
+      // Normalize them so Home/Draw/Away cannot render twice.
+      const marketKey =
+        rawMarketKey === "h2h" || rawMarketKey === "1x2"
+          ? "1x2"
+          : rawMarketKey;
 
       if (!grouped[marketKey]) {
         grouped[marketKey] = [];
       }
 
-      grouped[marketKey].push(
-        odd,
-      );
+      grouped[marketKey].push(odd);
+    }
+
+    // Remove duplicate selections inside each normalized market.
+    // For duplicated provider rows, keep the highest active price.
+    for (const marketKey of Object.keys(grouped)) {
+      const selectionMap = new Map<string, Odd>();
+
+      for (const odd of grouped[marketKey]) {
+        const normalizedSelection = odd.selection.trim().toLowerCase();
+        let selectionKey = normalizedSelection;
+
+        if (marketKey === "1x2") {
+          if (
+            normalizedSelection === "1" ||
+            normalizedSelection === "home" ||
+            normalizedSelection === match.home_team.trim().toLowerCase()
+          ) {
+            selectionKey = "home";
+          } else if (
+            normalizedSelection === "x" ||
+            normalizedSelection === "draw"
+          ) {
+            selectionKey = "draw";
+          } else if (
+            normalizedSelection === "2" ||
+            normalizedSelection === "away" ||
+            normalizedSelection === match.away_team.trim().toLowerCase()
+          ) {
+            selectionKey = "away";
+          }
+        }
+
+        const lineKey = String(odd.line ?? "");
+        const key = `${selectionKey}|${lineKey}`;
+        const existing = selectionMap.get(key);
+
+        if (
+          !existing ||
+          Number(odd.odds) > Number(existing.odds)
+        ) {
+          selectionMap.set(key, odd);
+        }
+      }
+
+      grouped[marketKey] = Array.from(selectionMap.values());
     }
 
     return Object.entries(
@@ -2677,7 +2732,7 @@ export default function Home() {
             type="button"
             aria-label="Close betslip"
             onClick={() => setMobileBetSlipOpen(false)}
-            className="fixed inset-0 z-[58] bg-[#071b34]/70 backdrop-blur-[2px] lg:hidden"
+            className="fixed inset-0 z-[78] bg-[#071b34]/70 backdrop-blur-[2px] lg:hidden"
           />
         )}
 
@@ -2686,9 +2741,9 @@ export default function Home() {
           id="mobile-betslip"
           className={`${
             mobileBetSlipOpen
-              ? "fixed inset-x-0 bottom-0 z-[60] block max-h-[calc(100dvh-64px)] overflow-y-auto rounded-t-3xl border border-gray-200 bg-white shadow-[0_-18px_50px_rgba(7,27,52,0.28)]"
+              ? "fixed inset-x-0 bottom-0 z-[80] block max-h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain rounded-t-3xl border border-gray-200 bg-white pb-[calc(env(safe-area-inset-bottom)+16px)] shadow-[0_-18px_50px_rgba(7,27,52,0.28)]"
               : "hidden"
-          } h-fit overflow-hidden lg:sticky lg:top-20 lg:block lg:max-h-none lg:overflow-hidden lg:rounded-2xl lg:border lg:border-gray-200 lg:bg-white lg:shadow-lg`}
+          } h-fit lg:sticky lg:top-20 lg:block lg:max-h-none lg:overflow-hidden lg:rounded-2xl lg:border lg:border-gray-200 lg:bg-white lg:shadow-lg`}
         >
           <div className="flex items-center justify-between border-b border-white/10 bg-[#071b34] px-4 py-2 lg:hidden">
             <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">
@@ -3430,18 +3485,18 @@ export default function Home() {
       {/* MATCH DETAILS */}
       {selectedMatch && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
           onClick={
             closeMatchDetails
           }
         >
           <div
-            className="max-h-[94vh] w-full max-w-4xl overflow-hidden rounded-t-3xl bg-[#f4f6f8] shadow-2xl sm:rounded-3xl"
+            className="flex h-[100dvh] max-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl bg-[#f4f6f8] shadow-2xl sm:h-auto sm:max-h-[94vh] sm:rounded-3xl"
             onClick={(event) =>
               event.stopPropagation()
             }
           >
-            <div className="bg-[#071b34] px-5 py-5 text-white sm:px-7 sm:py-6">
+            <div className="shrink-0 bg-[#071b34] px-5 py-5 text-white sm:px-7 sm:py-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -3527,7 +3582,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="max-h-[calc(94vh-205px)] overflow-y-auto p-3 sm:p-6">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-8 sm:p-6">
               {getMatchMarkets(
                 selectedMatch,
               ).length === 0 ? (
