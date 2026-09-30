@@ -216,6 +216,8 @@ export default function Home() {
     useState("");
   const [authError, setAuthError] =
     useState("");
+  const [authSuccess, setAuthSuccess] =
+    useState("");
   const [authSubmitting, setAuthSubmitting] =
     useState(false);
 
@@ -483,6 +485,7 @@ export default function Home() {
           await loadCurrentUser(confirmedAccessToken);
 
           setAuthError("");
+          setAuthSuccess("");
           setAuthMode(null);
           setEmail("");
           setPassword("");
@@ -526,6 +529,7 @@ export default function Home() {
     event.preventDefault();
 
     setAuthError("");
+    setAuthSuccess("");
     setAuthSubmitting(true);
 
     try {
@@ -568,8 +572,8 @@ export default function Home() {
            * link returns to BETZONE, where restoreSession() above consumes
            * the returned access token and logs the customer in automatically.
            */
-          setAuthError(
-            "Registration successful. Check your email and click Confirm Email. You will be logged in automatically.",
+          setAuthSuccess(
+            "Registration successful. Please check your email and click the verification link. You will be logged in automatically.",
           );
           setAuthMode(null);
           setEmail("");
@@ -589,6 +593,7 @@ export default function Home() {
 
       await loadCurrentUser(token);
 
+      setAuthSuccess("");
       setEmail("");
       setPassword("");
       setAuthMode(null);
@@ -613,6 +618,7 @@ export default function Home() {
     setWallet(null);
     setAccountOpen(false);
     setAuthMode(null);
+    setAuthSuccess("");
 
     setBetSlip([]);
     setStake("");
@@ -2069,6 +2075,34 @@ export default function Home() {
   return (
     <>
       <main className="betzone-page min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
+      {authSuccess && (
+        <div className="fixed left-1/2 top-20 z-[70] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2">
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-black text-white">
+                ✓
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-green-800">
+                  Registration successful
+                </p>
+                <p className="mt-1 text-sm font-medium leading-6 text-green-700">
+                  Please check your email and click the verification link. You will be logged in automatically.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuthSuccess("")}
+                className="shrink-0 rounded-lg px-2 py-1 text-lg font-bold text-green-700 transition hover:bg-green-100"
+                aria-label="Close registration message"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-[#071b34] text-white shadow-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3">
@@ -4910,6 +4944,7 @@ export default function Home() {
                   }
                   onClick={() => {
                     setAuthError("");
+                    setAuthSuccess("");
 
                     setAuthMode(
                       authMode ===
