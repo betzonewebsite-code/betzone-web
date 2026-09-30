@@ -15,6 +15,7 @@ type League = {
   name: string;
   country: string;
   sport: string;
+  sport_key?: string;
   is_active: boolean;
 };
 
@@ -758,33 +759,77 @@ export default function Home() {
         setLoadingMatches(true);
         setError("");
 
+        if (selectedSport === "all") {
+          const activeSports = sports.filter((sport) => sport.is_active);
+
+          const leagueResults = await Promise.all(
+            activeSports.map(async (sport) => {
+              try {
+                const response = await fetch(
+                  `${API_URL}/sports/${sport.sport_key}/leagues`,
+                );
+
+                if (!response.ok) {
+                  return [] as League[];
+                }
+
+                const data: League[] = await response.json();
+
+                return data.map((league) => ({
+                  ...league,
+                  sport_key: sport.sport_key,
+                }));
+              } catch {
+                return [] as League[];
+              }
+            }),
+          );
+
+          const allLeagues = leagueResults
+            .flat()
+            .filter((league, index, array) =>
+              array.findIndex((item) => item.id === league.id) === index,
+            );
+
+          setLeagues(allLeagues);
+
+          if (allLeagues.length > 0) {
+            const premierLeague = allLeagues.find(
+              (league) => league.name === "Premier League",
+            );
+
+            setSelectedLeague(premierLeague?.id ?? allLeagues[0].id);
+          } else {
+            setSelectedLeague("");
+            setMatches([]);
+            setOdds([]);
+          }
+
+          return;
+        }
+
         const response = await fetch(
           `${API_URL}/sports/${selectedSport}/leagues`,
         );
 
         if (!response.ok) {
-          throw new Error(
-            "Failed to load leagues",
-          );
+          throw new Error("Failed to load leagues");
         }
 
-        const data: League[] =
-          await response.json();
+        const data: League[] = await response.json();
+        const leaguesWithSport = data.map((league) => ({
+          ...league,
+          sport_key: selectedSport,
+        }));
 
-        setLeagues(data);
+        setLeagues(leaguesWithSport);
 
-        if (data.length > 0) {
-          const premierLeague =
-            data.find(
-              (league) =>
-                league.name ===
-                "Premier League",
-            );
-
-          setSelectedLeague(
-            premierLeague?.id ??
-              data[0].id,
+        if (leaguesWithSport.length > 0) {
+          const premierLeague = leaguesWithSport.find(
+            (league) => league.name === "Premier League",
           );
+
+          setSelectedLeague(premierLeague?.id ?? leaguesWithSport[0].id);
         } else {
           setSelectedLeague("");
           setMatches([]);
@@ -799,7 +844,9 @@ export default function Home() {
         setOdds([]);
 
         setError(
-          `No leagues are currently available for ${selectedSport}.`,
+          selectedSport === "all"
+            ? "No leagues are currently available."
+            : `No leagues are currently available for ${selectedSport}.`,
         );
       } finally {
         setLoadingMatches(false);
@@ -807,14 +854,22 @@ export default function Home() {
     }
 
     loadLeagues();
-  }, [selectedSport]);
+  }, [selectedSport, sports]);
 
   useEffect(() => {
     async function loadMatches() {
-      if (
-        !selectedSport ||
-        !selectedLeague
-      ) {
+      if (!selectedSport || !selectedLeague) {
+        setMatches([]);
+        setOdds([]);
+        return;
+      }
+
+      const activeLeague = leagues.find(
+        (league) => league.id === selectedLeague,
+      );
+      const leagueSportKey = activeLeague?.sport_key ?? selectedSport;
+
+      if (!leagueSportKey || leagueSportKey === "all") {
         setMatches([]);
         setOdds([]);
         return;
@@ -825,7 +880,7 @@ export default function Home() {
         setError("");
 
         const response = await fetch(
-          `${API_URL}/sports/${selectedSport}/leagues/${selectedLeague}/matches`,
+          `${API_URL}/sports/${leagueSportKey}/leagues/${selectedLeague}/matches`,
         );
 
         if (!response.ok) {
@@ -845,7 +900,7 @@ export default function Home() {
           try {
             const oddsResponse =
               await fetch(
-                `${API_URL}/sports/${selectedSport}/leagues/${selectedLeague}/matches/${match.id}/markets`,
+                `${API_URL}/sports/${leagueSportKey}/leagues/${selectedLeague}/matches/${match.id}/markets`,
               );
 
             if (!oddsResponse.ok) {
@@ -883,6 +938,7 @@ export default function Home() {
   }, [
     selectedSport,
     selectedLeague,
+    leagues,
   ]);
 
   const oddsByMatch = useMemo(() => {
@@ -1988,6 +2044,21 @@ export default function Home() {
             <button
               type="button"
               onClick={() => {
+                setSelectedSport("all");
+                setSelectedLeague("");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-black transition ${
+                selectedSport === "all"
+                  ? "bg-[#071b34] text-white shadow-sm"
+                  : "bg-[#fff9df] text-[#071b34] border border-[#f5b400]/40"
+              }`}
+            >
+              All Sports
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setSelectedSport("football");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
@@ -2046,6 +2117,46 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* MOBILE LEAGUES */}
+      <section className="border-b border-[#e7ebef] bg-white lg:hidden">
+        <div className="px-3 py-2">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-[9px] font-black uppercase tracking-[0.18em] text-gray-400">
+              Leagues
+            </span>
+            {selectedSport === "all" && (
+              <span className="text-[9px] font-bold text-[#f5b400]">All Sports</span>
+            )}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {leagues.map((league) => (
+              <button
+                key={league.id}
+                type="button"
+                onClick={() => {
+                  if (league.sport_key && league.sport_key !== selectedSport) {
+                    setSelectedSport(league.sport_key);
+                  }
+                  setSelectedLeague(league.id);
+                }}
+                className={`shrink-0 rounded-lg border px-3 py-1.5 text-[10px] font-black transition ${
+                  selectedLeague === league.id
+                    ? "border-[#071b34] bg-[#071b34] text-white"
+                    : "border-gray-200 bg-[#f7f8fa] text-gray-600"
+                }`}
+              >
+                {league.name}
+              </button>
+            ))}
+            {leagues.length === 0 && (
+              <span className="py-1 text-[10px] font-semibold text-gray-400">
+                No leagues available
+              </span>
+            )}
+          </div>
         </div>
       </section>
 
@@ -4559,6 +4670,11 @@ export default function Home() {
       )}
       <style jsx global>{`
         @media (max-width: 639px) {
+          .betzone-page {
+            zoom: 0.75;
+            width: 133.333333%;
+          }
+
           .betzone-page [class*="text-2xl"] {
             font-size: 1.25rem !important;
             line-height: 1.35 !important;
