@@ -4525,7 +4525,10 @@ export default function Home() {
                   0,
               );
               const ticketReturn = Number(
-                selectedMyBet.payout ?? selectedMyBet.winnings ?? 0,
+                selectedMyBet.actual_return ??
+                  selectedMyBet.payout ??
+                  selectedMyBet.winnings ??
+                  0,
               );
               const ticketReference = String(selectedMyBet.bet_reference ?? "");
               const ticketIsSettled = !["open", "pending", "active", "unsettled"].includes(
