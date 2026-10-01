@@ -75,6 +75,7 @@ type BetRecord = {
   stake?: string | number;
   total_odds?: string | number;
   odds?: string | number;
+  potential_return?: string | number;
   potential_payout?: string | number;
   potential_win?: string | number;
   payout?: string | number;
@@ -92,6 +93,7 @@ type BetRecord = {
   result?: string;
   price?: string | number;
   market?: string;
+  actual_return?: string | number;
   selections?: BetRecord[];
   bet_selections?: BetRecord[];
   [key: string]: unknown;
@@ -3062,6 +3064,7 @@ export default function Home() {
                         bet.potential_payout ??
                         0,
                     );
+                    const actualReturn = Number(bet.actual_return ?? 0);
                     const betId = String(bet.id ?? bet.bet_reference ?? "bet");
                     const bookingCode = String(bet.bet_reference ?? "");
 
@@ -3094,7 +3097,7 @@ export default function Home() {
                           </span>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-3 gap-2 border-y border-gray-100 py-3">
+                        <div className="mt-3 grid grid-cols-2 gap-2 border-y border-gray-100 py-3 sm:grid-cols-4">
                           <div>
                             <div className="text-[9px] uppercase tracking-wide text-gray-400">Stake</div>
                             <div className="mt-1 text-xs font-black">GHS {stakeValue.toFixed(2)}</div>
@@ -3106,6 +3109,10 @@ export default function Home() {
                           <div>
                             <div className="text-[9px] uppercase tracking-wide text-gray-400">Pot. Win</div>
                             <div className="mt-1 text-xs font-black text-[#1b9b52]">GHS {potentialWin > 0 ? potentialWin.toFixed(2) : "0.00"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] uppercase tracking-wide text-gray-400">Return</div>
+                            <div className={`mt-1 text-xs font-black ${status === "WON" ? "text-[#1b9b52]" : "text-gray-900"}`}>GHS {actualReturn.toFixed(2)}</div>
                           </div>
                         </div>
 
