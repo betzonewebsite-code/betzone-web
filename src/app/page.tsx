@@ -111,6 +111,7 @@ type CurrentUser = {
     date_of_birth: string | null;
     gender: string | null;
     account_status: string | null;
+    verification_status: "unverified" | "pending" | "verified" | "rejected" | null;
   } | null;
 };
 
@@ -200,6 +201,26 @@ export default function Home() {
     useState(true);
   const [customerSettingsOpen, setCustomerSettingsOpen] =
     useState(false);
+
+  const [verificationOpen, setVerificationOpen] =
+    useState(false);
+  const [kycFormOpen, setKycFormOpen] = useState(false);
+  const [kycForm, setKycForm] = useState({
+    first_name: "",
+    last_name: "",
+    date_of_birth: "",
+    gender: "",
+    phone: "",
+    id_type: "",
+    id_number: "",
+    residential_address: "",
+  });
+  const [kycFrontFile, setKycFrontFile] = useState<File | null>(null);
+  const [kycBackFile, setKycBackFile] = useState<File | null>(null);
+  const [kycSelfieFile, setKycSelfieFile] = useState<File | null>(null);
+  const [kycSubmitting, setKycSubmitting] = useState(false);
+  const [kycSubmitError, setKycSubmitError] = useState("");
+  const [kycSubmitSuccess, setKycSubmitSuccess] = useState("");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedReference = params.get("loadBet")?.trim().toUpperCase();
@@ -393,7 +414,7 @@ export default function Home() {
         id: data.id,
         email: data.email,
         role: data.role,
-        profile: data.profile ?? null,
+        profile: data.profiles ?? null,
       });
 
       setWallet({
@@ -407,7 +428,7 @@ export default function Home() {
           id: data.id,
           email: data.email,
           role: data.role,
-          profile: data.profile ?? null,
+          profile: data.profiles ?? null,
         }),
       );
     } catch (err) {
@@ -2101,6 +2122,28 @@ export default function Home() {
     setLoadBetSuccess("");
   }
 
+
+  const verificationStatus =
+    user?.profile?.verification_status ?? "unverified";
+
+  const verificationVisible =
+    verificationStatus !== "verified";
+
+  const verificationTitle =
+    verificationStatus === "pending"
+      ? "Verification Pending"
+      : verificationStatus === "rejected"
+        ? "Verification Rejected"
+        : "Verify Your Account";
+
+  const verificationDescription =
+    verificationStatus === "pending"
+      ? "Your KYC submission has been received and is currently being reviewed."
+      : verificationStatus === "rejected"
+        ? "Your KYC submission was rejected. Review the reason and resubmit your information."
+        : "Complete your KYC verification to unlock all BETZONE account features.";
+
+
   return (
     <>
       <main className="betzone-page min-h-screen bg-[#f4f6f8] pb-20 lg:pb-0">
@@ -2318,6 +2361,414 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* ACCOUNT VERIFICATION BANNER */}
+      {user && verificationVisible && (
+        <section className="border-b border-[#f5b400]/30 bg-[#fff8df]">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f5b400] text-[#071b34]">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M12 3 4.5 6v5.5c0 4.7 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.8 7.5-9.5V6L12 3Z" />
+                  <path d="M12 8v4" />
+                  <path d="M12 15.5h.01" />
+                </svg>
+              </div>
+
+              <div>
+                <p className="text-sm font-black text-[#071b34]">
+                  {verificationTitle}
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                  {verificationDescription}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setVerificationOpen(true)}
+              className="w-full rounded-xl bg-[#071b34] px-5 py-2.5 text-xs font-black text-white transition hover:bg-[#102c50] sm:w-auto"
+            >
+              {verificationStatus === "pending"
+                ? "View Verification Status"
+                : verificationStatus === "rejected"
+                  ? "Review & Resubmit"
+                  : "Verify Your Account"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* KYC ENTRY MODAL */}
+      {verificationOpen && !kycFormOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setVerificationOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="bg-[#071b34] px-6 py-5 text-white">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#f5b400]">
+                    BETZONE
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">KYC Verification</h2>
+                  <p className="mt-1 text-xs text-white/60">
+                    Verify your account before using restricted account features.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVerificationOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white/70 transition hover:bg-white/20 hover:text-white"
+                  aria-label="Close verification"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="rounded-xl border border-[#f5b400]/30 bg-[#fffaf0] p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-[#071b34]">
+                  Account status
+                </p>
+                <p className="mt-1 text-sm font-bold text-amber-700">
+                  {verificationStatus === "pending"
+                    ? "Pending review"
+                    : verificationStatus === "rejected"
+                      ? "Rejected"
+                      : "Not verified"}
+                </p>
+              </div>
+
+              <p className="mt-5 text-sm leading-6 text-slate-600">
+                {verificationStatus === "pending"
+                  ? "Your KYC submission has been received. An authorized BETZONE administrator must review it before your account can be verified."
+                  : verificationStatus === "rejected"
+                    ? user?.profile?.verification_status === "rejected"
+                      ? "Your previous KYC submission was rejected. Please review the rejection information and submit the required information again."
+                      : "Please review your information and supporting identity documents before submitting."
+                    : "Provide your personal information and supporting identity documents. Your submission will be stored securely and reviewed by an authorized BETZONE administrator."}
+              </p>
+
+              {verificationStatus !== "pending" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKycForm({
+                    first_name: user?.profile?.first_name ?? "",
+                    last_name: user?.profile?.last_name ?? "",
+                    date_of_birth: user?.profile?.date_of_birth
+                      ? user.profile.date_of_birth.slice(0, 10)
+                      : "",
+                    gender: user?.profile?.gender ?? "",
+                    phone: user?.profile?.phone ?? "",
+                    id_type: "",
+                    id_number: "",
+                    residential_address: "",
+                  });
+                  setKycFormOpen(true);
+                }}
+                className="mt-6 w-full rounded-xl bg-[#f5b400] py-3.5 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b]"
+              >
+                {verificationStatus === "rejected"
+                  ? "Review & Resubmit"
+                  : "Continue to Verification"}
+              </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KYC FORM */}
+      {kycFormOpen && (
+        <div
+          className="fixed inset-0 z-[95] overflow-y-auto bg-black/60 p-3 sm:p-6"
+          onClick={() => setKycFormOpen(false)}
+        >
+          <div
+            className="mx-auto my-4 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-8"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="bg-[#071b34] px-5 py-5 text-white sm:px-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#f5b400]">BETZONE</p>
+                  <h2 className="mt-1 text-xl font-black sm:text-2xl">KYC Verification</h2>
+                  <p className="mt-1 max-w-xl text-xs leading-5 text-white/65">
+                    Complete the information below and provide clear identity documents for account review.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKycFormOpen(false)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg text-white/70 transition hover:bg-white/20 hover:text-white"
+                  aria-label="Close KYC form"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <form
+              className="p-5 sm:p-7"
+              onSubmit={async (event) => {
+                event.preventDefault();
+
+                setKycSubmitError("");
+                setKycSubmitSuccess("");
+
+                const token = localStorage.getItem(TOKEN_KEY);
+
+                if (!token) {
+                  setKycFormOpen(false);
+                  setAuthError("");
+                  setAuthMode("login");
+                  return;
+                }
+
+                if (!kycFrontFile || !kycBackFile || !kycSelfieFile) {
+                  setKycSubmitError(
+                    "Please select your ID front, ID back, and selfie before submitting.",
+                  );
+                  return;
+                }
+
+                setKycSubmitting(true);
+
+                try {
+                  const formData = new FormData();
+
+formData.append(
+  "first_name",
+  kycForm.first_name.trim(),
+);
+
+formData.append(
+  "last_name",
+  kycForm.last_name.trim(),
+);
+
+formData.append(
+  "date_of_birth",
+  kycForm.date_of_birth,
+);
+
+formData.append(
+  "gender",
+  kycForm.gender.trim(),
+);
+
+formData.append(
+  "phone",
+  kycForm.phone.trim(),
+);
+
+formData.append(
+  "residential_address",
+  kycForm.residential_address.trim(),
+);
+
+formData.append(
+  "id_type",
+  kycForm.id_type.trim(),
+);
+
+formData.append(
+  "id_number",
+  kycForm.id_number.trim(),
+);
+
+formData.append(
+  "documents",
+  kycFrontFile,
+);
+
+formData.append(
+  "documents",
+  kycBackFile,
+);
+
+formData.append(
+  "documents",
+  kycSelfieFile,
+);
+
+const response = await fetch(`${API_URL}/kyc/submit`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+  body: formData,
+});
+
+                  const data = await response.json().catch(() => null);
+
+                  if (!response.ok) {
+                    const message = data?.message || data?.error || "KYC submission failed.";
+                    throw new Error(
+                      Array.isArray(message) ? message.join(", ") : String(message),
+                    );
+                  }
+
+                  setKycSubmitSuccess(
+                    data?.message ||
+                      "KYC submitted successfully. Your account is pending review.",
+                  );
+
+                  await loadCurrentUser(token);
+
+                  window.setTimeout(() => {
+                    setKycFormOpen(false);
+                    setVerificationOpen(false);
+                    setKycSubmitSuccess("");
+                    setKycFrontFile(null);
+                    setKycBackFile(null);
+                    setKycSelfieFile(null);
+                  }, 1800);
+                } catch (err) {
+                  console.error("KYC submission failed", err);
+                  setKycSubmitError(
+                    err instanceof Error ? err.message : "KYC submission failed.",
+                  );
+                } finally {
+                  setKycSubmitting(false);
+                }
+              }}
+            >
+              <div className="mb-6">
+                <h3 className="text-sm font-black text-[#071b34]">1. Personal Information</h3>
+                <p className="mt-1 text-xs text-slate-500">Use the same legal information shown on your identity document.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">First name</span>
+                  <input required value={kycForm.first_name} onChange={(e) => setKycForm((v) => ({ ...v, first_name: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20" />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Last name</span>
+                  <input required value={kycForm.last_name} onChange={(e) => setKycForm((v) => ({ ...v, last_name: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20" />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Date of birth</span>
+                  <input required type="date" value={kycForm.date_of_birth} onChange={(e) => setKycForm((v) => ({ ...v, date_of_birth: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20" />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Gender</span>
+                  <select required value={kycForm.gender} onChange={(e) => setKycForm((v) => ({ ...v, gender: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20">
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Phone number</span>
+                  <input required type="tel" value={kycForm.phone} onChange={(e) => setKycForm((v) => ({ ...v, phone: e.target.value }))} placeholder="e.g. 0240000000" className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20" />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Residential address</span>
+                  <textarea required rows={3} value={kycForm.residential_address} onChange={(e) => setKycForm((v) => ({ ...v, residential_address: e.target.value }))} placeholder="Enter your current residential address" className="w-full resize-none rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20" />
+                </label>
+              </div>
+
+              <div className="my-8 border-t border-slate-100 pt-7">
+                <h3 className="text-sm font-black text-[#071b34]">2. Identity Document</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Provide a valid government-issued identity document. Enter the details exactly as shown on the document.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Document type</span>
+                  <select required value={kycForm.id_type} onChange={(e) => setKycForm((v) => ({ ...v, id_type: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20">
+                    <option value="">Select document</option>
+                    <option value="ghana_card">Ghana Card</option>
+                    <option value="passport">Passport</option>
+                    <option value="drivers_license">Driver's Licence</option>
+                    <option value="voter_id">Voter ID</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black text-slate-700">Document number</span>
+                  <input required value={kycForm.id_number} onChange={(e) => setKycForm((v) => ({ ...v, id_number: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm uppercase outline-none transition focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/20" />
+                </label>
+              </div>
+
+              <div className="my-8 border-t border-slate-100 pt-7">
+                <h3 className="text-sm font-black text-[#071b34]">3. Supporting Documents</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Upload clear, readable images. Do not upload altered or misleading documents.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-[#f5b400]">
+                  <span className="block text-xs font-black text-[#071b34]">ID front</span>
+                  <span className="mt-1 block text-[11px] leading-4 text-slate-500">Front of your identity document</span>
+                  <input required type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => setKycFrontFile(e.target.files?.[0] ?? null)} className="mt-3 block w-full text-[11px]" />
+                  {kycFrontFile && <span className="mt-2 block truncate text-[10px] font-bold text-emerald-700">{kycFrontFile.name}</span>}
+                </label>
+                <label className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-[#f5b400]">
+                  <span className="block text-xs font-black text-[#071b34]">ID back</span>
+                  <span className="mt-1 block text-[11px] leading-4 text-slate-500">Back of your identity document</span>
+                  <input required type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => setKycBackFile(e.target.files?.[0] ?? null)} className="mt-3 block w-full text-[11px]" />
+                  {kycBackFile && <span className="mt-2 block truncate text-[10px] font-bold text-emerald-700">{kycBackFile.name}</span>}
+                </label>
+                <label className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-[#f5b400]">
+                  <span className="block text-xs font-black text-[#071b34]">Selfie</span>
+                  <span className="mt-1 block text-[11px] leading-4 text-slate-500">A clear recent photo of yourself</span>
+                  <input required type="file" accept="image/jpeg,image/png" onChange={(e) => setKycSelfieFile(e.target.files?.[0] ?? null)} className="mt-3 block w-full text-[11px]" />
+                  {kycSelfieFile && <span className="mt-2 block truncate text-[10px] font-bold text-emerald-700">{kycSelfieFile.name}</span>}
+                </label>
+              </div>
+
+              {kycSubmitError && (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+                  {kycSubmitError}
+                </div>
+              )}
+
+              {kycSubmitSuccess && (
+                <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
+                  {kycSubmitSuccess}
+                </div>
+              )}
+
+              <div className="mt-7 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black text-[#071b34]">Before you submit</p>
+                <ul className="mt-2 space-y-1 text-[11px] leading-5 text-slate-600">
+                  <li>• Make sure the personal information matches your identity document.</li>
+                  <li>• Make sure uploaded documents are clear and readable.</li>
+                  <li>• Your information will be submitted for BETZONE administrator review.</li>
+                </ul>
+              </div>
+
+              <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setKycFormOpen(false)}
+                  disabled={kycSubmitting}
+                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-black text-[#071b34] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={kycSubmitting}
+                  className="rounded-xl bg-[#f5b400] px-6 py-3 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {kycSubmitting ? "Submitting..." : "Submit for Review"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* PREMIUM MOBILE NAVIGATION */}
       <section className="border-b border-[#e7ebef] bg-white lg:hidden">
@@ -4932,7 +5383,40 @@ export default function Home() {
             </div>
 
             <div className="p-5">
-              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                    First Name
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-[#071b34]">
+                    {user?.profile?.first_name || "-"}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                    Last Name
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-[#071b34]">
+                    {user?.profile?.last_name || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                  Full Name
+                </p>
+                <p className="mt-1 text-sm font-bold text-[#071b34]">
+                  {user?.profile?.full_name ||
+                    [user?.profile?.first_name, user?.profile?.last_name]
+                      .filter(Boolean)
+                      .join(" ") ||
+                    "-"}
+                </p>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
                   Account Email
                 </p>

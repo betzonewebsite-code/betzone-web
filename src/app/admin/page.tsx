@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
-
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 const API_URL =
@@ -16,6 +14,7 @@ type AdminSection =
   | "deposits"
   | "withdrawals"
   | "users"
+  | "kyc"
   | "wallet"
   | "platform-settings"
   | "admin-security";
@@ -190,6 +189,28 @@ type AdminUser = {
     status?: string | null;
     created_at?: string | null;
   } | null;
+};
+
+type AdminKycSubmission = {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  phone: string;
+  residential_address: string;
+  id_type: string;
+  id_number: string;
+  id_front_url?: string | null;
+  id_back_url?: string | null;
+  selfie_url?: string | null;
+  status: string;
+  rejection_reason?: string | null;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type AdminWallet = {
@@ -499,9 +520,6 @@ export default function AdminPage() {
   const [section, setSection] =
     useState<AdminSection>("dashboard");
 
-  const [mobileAdminMenuOpen, setMobileAdminMenuOpen] =
-    useState(false);
-
   // Platform Settings — interface state. Backend persistence and enforcement
   // will be connected after this admin UI is in place.
   const [platformName, setPlatformName] = useState("BETZONE");
@@ -522,18 +540,6 @@ export default function AdminPage() {
   const [depositsEnabled, setDepositsEnabled] = useState(true);
   const [withdrawalsEnabled, setWithdrawalsEnabled] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-
-  const [customerZoom, setCustomerZoom] = useState("75");
-  const [customerFontSize, setCustomerFontSize] = useState("normal");
-  const [customerFontFamily, setCustomerFontFamily] = useState("system");
-
-  const [manualDepositEnabled, setManualDepositEnabled] = useState(true);
-  const [manualDepositProvider, setManualDepositProvider] = useState("MTN Mobile Money");
-  const [manualDepositAccountName, setManualDepositAccountName] = useState("BETZONE");
-  const [manualDepositPhoneNumber, setManualDepositPhoneNumber] = useState("");
-  const [manualDepositInstructions, setManualDepositInstructions] = useState(
-    "Send your deposit to the BETZONE Mobile Money number shown above, then enter the exact Mobile Money transaction ID.",
-  );
 
   const [platformSettingsLoading, setPlatformSettingsLoading] =
     useState(false);
@@ -607,9 +613,6 @@ export default function AdminPage() {
     useState("");
 
   const [matchManagementSportFilter, setMatchManagementSportFilter] =
-    useState("all");
-
-  const [settlementSportFilter, setSettlementSportFilter] =
     useState("all");
 
   const [selectedMatch, setSelectedMatch] =
@@ -748,6 +751,27 @@ export default function AdminPage() {
     useState("");
 
   const [walletSearch, setWalletSearch] =
+    useState("");
+
+  const [kycSubmissions, setKycSubmissions] =
+    useState<AdminKycSubmission[]>([]);
+
+  const [kycLoading, setKycLoading] =
+    useState(true);
+
+  const [kycError, setKycError] =
+    useState("");
+
+  const [selectedKyc, setSelectedKyc] =
+    useState<AdminKycSubmission | null>(null);
+
+  const [kycRejectReason, setKycRejectReason] =
+    useState("");
+
+  const [kycActionLoading, setKycActionLoading] =
+    useState(false);
+
+  const [kycMessage, setKycMessage] =
     useState("");
 
   const [selectedCustomer, setSelectedCustomer] =
@@ -987,25 +1011,6 @@ export default function AdminPage() {
       setDepositsEnabled(Boolean(settings.deposits_enabled));
       setWithdrawalsEnabled(Boolean(settings.withdrawals_enabled));
       setMaintenanceMode(Boolean(settings.maintenance_mode));
-      setCustomerZoom(String(settings.customer_zoom ?? "75"));
-      setCustomerFontSize(String(settings.customer_font_size ?? "normal"));
-      setCustomerFontFamily(String(settings.customer_font_family ?? "system"));
-      setManualDepositEnabled(Boolean(settings.manual_deposit_enabled));
-      setManualDepositProvider(
-        String(settings.manual_deposit_provider ?? "MTN Mobile Money"),
-      );
-      setManualDepositAccountName(
-        String(settings.manual_deposit_account_name ?? "BETZONE"),
-      );
-      setManualDepositPhoneNumber(
-        String(settings.manual_deposit_phone_number ?? ""),
-      );
-      setManualDepositInstructions(
-        String(
-          settings.manual_deposit_instructions ??
-            "Send your deposit to the BETZONE Mobile Money number shown above, then enter the exact Mobile Money transaction ID.",
-        ),
-      );
       setPlatformSettingsLastLoaded(new Date().toISOString());
     } catch (error) {
       setPlatformSettingsError(
@@ -1097,30 +1102,6 @@ export default function AdminPage() {
       return;
     }
 
-    if (!manualDepositProvider.trim()) {
-      setPlatformSettingsError("Manual deposit provider is required.");
-      setPlatformSettingsMessage("");
-      return;
-    }
-
-    if (!manualDepositAccountName.trim()) {
-      setPlatformSettingsError("Manual deposit account name is required.");
-      setPlatformSettingsMessage("");
-      return;
-    }
-
-    if (!manualDepositPhoneNumber.trim()) {
-      setPlatformSettingsError("Manual deposit Mobile Money number is required.");
-      setPlatformSettingsMessage("");
-      return;
-    }
-
-    if (!manualDepositInstructions.trim()) {
-      setPlatformSettingsError("Manual deposit instructions are required.");
-      setPlatformSettingsMessage("");
-      return;
-    }
-
     try {
       setSavingPlatformSettings(true);
       setPlatformSettingsError("");
@@ -1153,14 +1134,6 @@ export default function AdminPage() {
             deposits_enabled: depositsEnabled,
             withdrawals_enabled: withdrawalsEnabled,
             maintenance_mode: maintenanceMode,
-            manual_deposit_enabled: manualDepositEnabled,
-            manual_deposit_provider: manualDepositProvider.trim(),
-            manual_deposit_account_name: manualDepositAccountName.trim(),
-            manual_deposit_phone_number: manualDepositPhoneNumber.trim(),
-            manual_deposit_instructions: manualDepositInstructions.trim(),
-            customer_zoom: Number(customerZoom),
-            customer_font_size: customerFontSize,
-            customer_font_family: customerFontFamily,
           }),
         },
       );
@@ -1197,9 +1170,6 @@ export default function AdminPage() {
         setDepositsEnabled(Boolean(saved.deposits_enabled));
         setWithdrawalsEnabled(Boolean(saved.withdrawals_enabled));
         setMaintenanceMode(Boolean(saved.maintenance_mode));
-        setCustomerZoom(String(saved.customer_zoom ?? customerZoom));
-        setCustomerFontSize(String(saved.customer_font_size ?? customerFontSize));
-        setCustomerFontFamily(String(saved.customer_font_family ?? customerFontFamily));
       }
 
       await loadPlatformSettings();
@@ -1748,6 +1718,166 @@ export default function AdminPage() {
           ? error.message
           : `Failed to ${action} withdrawal.`,
       );
+    }
+  }
+
+  async function loadKycSubmissions() {
+    const token = getAccessToken();
+
+    if (!token) {
+      setKycError("Authentication required.");
+      setKycLoading(false);
+      return;
+    }
+
+    try {
+      setKycLoading(true);
+      setKycError("");
+
+      const response = await fetch(`${API_URL}/admin/kyc/pending`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(data, "Failed to load pending KYC submissions."),
+        );
+      }
+
+      const array = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+      setKycSubmissions(array);
+    } catch (error) {
+      setKycError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load pending KYC submissions.",
+      );
+    } finally {
+      setKycLoading(false);
+    }
+  }
+
+  async function approveKyc(id: string) {
+    const token = getAccessToken();
+
+    if (!token) {
+      setKycError("Authentication required.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Approve this customer's KYC verification?",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setKycActionLoading(true);
+      setKycError("");
+      setKycMessage("");
+
+      const response = await fetch(`${API_URL}/admin/kyc/${id}/approve`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(data, "Failed to approve KYC submission."),
+        );
+      }
+
+      setKycMessage(
+        data?.message || "KYC submission approved successfully.",
+      );
+      setSelectedKyc(null);
+      setKycRejectReason("");
+      await loadKycSubmissions();
+    } catch (error) {
+      setKycError(
+        error instanceof Error
+          ? error.message
+          : "Failed to approve KYC submission.",
+      );
+    } finally {
+      setKycActionLoading(false);
+    }
+  }
+
+  async function rejectKyc(id: string) {
+    const token = getAccessToken();
+
+    if (!token) {
+      setKycError("Authentication required.");
+      return;
+    }
+
+    const reason = kycRejectReason.trim();
+
+    if (!reason) {
+      setKycError("A rejection reason is required.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Reject this customer's KYC verification?",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setKycActionLoading(true);
+      setKycError("");
+      setKycMessage("");
+
+      const response = await fetch(`${API_URL}/admin/kyc/${id}/reject`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          rejection_reason: reason,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(data, "Failed to reject KYC submission."),
+        );
+      }
+
+      setKycMessage(
+        data?.message || "KYC submission rejected successfully.",
+      );
+      setSelectedKyc(null);
+      setKycRejectReason("");
+      await loadKycSubmissions();
+    } catch (error) {
+      setKycError(
+        error instanceof Error
+          ? error.message
+          : "Failed to reject KYC submission.",
+      );
+    } finally {
+      setKycActionLoading(false);
     }
   }
 
@@ -3188,45 +3318,6 @@ export default function AdminPage() {
       matchManagementSportFilter,
     ]);
 
-  const settlementMatches =
-    useMemo(() => {
-      const query =
-        matchSearch
-          .trim()
-          .toLowerCase();
-
-      return matches.filter((match) => {
-        const sportMatches =
-          settlementSportFilter === "all" ||
-          String(match.sport_key || "").toLowerCase() ===
-            settlementSportFilter.toLowerCase();
-
-        if (!sportMatches) {
-          return false;
-        }
-
-        if (!query) {
-          return true;
-        }
-
-        return (
-          match.home_team
-            .toLowerCase()
-            .includes(query) ||
-          match.away_team
-            .toLowerCase()
-            .includes(query) ||
-          match.sports_leagues?.name
-            ?.toLowerCase()
-            .includes(query)
-        );
-      });
-    }, [
-      matches,
-      matchSearch,
-      settlementSportFilter,
-    ]);
-
   const managementSports =
     useMemo(() => {
       const ordered = sports
@@ -3306,7 +3397,6 @@ export default function AdminPage() {
     next: AdminSection,
   ) {
     setSection(next);
-    setMobileAdminMenuOpen(false);
 
     // Every admin section is a page-level view. Always return the
     // viewport to the top when switching sections so a newly selected
@@ -3351,6 +3441,10 @@ export default function AdminPage() {
       loadUsers();
     }
 
+    if (next === "kyc") {
+      loadKycSubmissions();
+    }
+
     if (next === "wallet") {
       loadWallets();
     }
@@ -3370,6 +3464,7 @@ export default function AdminPage() {
     loadDeposits();
     loadWithdrawals();
     loadUsers();
+    loadKycSubmissions();
     loadWallets();
   }, []);
 
@@ -3402,6 +3497,8 @@ export default function AdminPage() {
                 ? "Withdrawals"
                 : section === "users"
                   ? "Users"
+                  : section === "kyc"
+                    ? "KYC Verification"
                   : section === "platform-settings"
                     ? "Platform Settings"
                     : section === "admin-security"
@@ -3450,7 +3547,7 @@ export default function AdminPage() {
             SIDEBAR
         ====================================================== */}
 
-        <aside className="hidden w-full shrink-0 bg-[#071b34] text-white lg:block lg:w-64">
+        <aside className="w-full shrink-0 bg-[#071b34] text-white lg:w-64">
           <div className="sticky top-0 flex max-h-screen flex-col">
             <div className="border-b border-white/10 px-5 py-4">
               <div className="text-2xl font-black tracking-tight">
@@ -3499,6 +3596,10 @@ export default function AdminPage() {
                 [
                   "users",
                   "Users",
+                ],
+                [
+                  "kyc",
+                  "KYC Verification",
                 ],
                 [
                   "platform-settings",
@@ -3575,19 +3676,10 @@ export default function AdminPage() {
               <div className="hidden rounded-xl bg-slate-100 px-4 py-2 text-xs font-black text-slate-500 sm:block">
                 Protected Admin Area
               </div>
-
-              <button
-                type="button"
-                onClick={() => setMobileAdminMenuOpen(true)}
-                className="rounded-xl bg-[#071b34] px-3 py-2 text-xs font-black text-white shadow-sm lg:hidden"
-                aria-label="Open admin menu"
-              >
-                Menu
-              </button>
             </div>
           </header>
 
-          <div className="mx-auto max-w-7xl p-3 pb-24 sm:p-6 sm:pb-6 lg:p-8">
+          <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
             {/* ==================================================
                 DASHBOARD
@@ -4157,47 +4249,8 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="text-xs font-black uppercase tracking-widest text-slate-400">
-                      Sport Navigation
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSettlementSportFilter("all")
-                        }
-                        className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                          settlementSportFilter === "all"
-                            ? "bg-[#f5b400] text-[#071b34]"
-                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                        }`}
-                      >
-                        All Sports
-                      </button>
-
-                      {managementSports.map((sport) => (
-                        <button
-                          key={sport.key}
-                          type="button"
-                          onClick={() =>
-                            setSettlementSportFilter(sport.key)
-                          }
-                          className={`rounded-xl px-4 py-2.5 text-xs font-black transition ${
-                            settlementSportFilter === sport.key
-                              ? "bg-[#f5b400] text-[#071b34] shadow-sm"
-                              : "border border-slate-200 bg-white text-slate-600 hover:border-[#f5b400] hover:bg-white"
-                          }`}
-                        >
-                          {sport.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="mt-5 space-y-3">
-                    {settlementMatches.map(
+                    {filteredMatches.map(
                       (match) => (
                         <div
                           key={match.id}
@@ -4260,7 +4313,7 @@ export default function AdminPage() {
                     )}
 
                     {!matchesLoading &&
-                      settlementMatches.length ===
+                      filteredMatches.length ===
                         0 && (
                         <div className="rounded-xl bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
                           No matches found.
@@ -6070,6 +6123,146 @@ export default function AdminPage() {
 
 
       {/* ======================================================
+          KYC VERIFICATION
+      ====================================================== */}
+      {section === "kyc" && (
+        <section>
+          <div className="space-y-6">
+            <div className="rounded-3xl bg-[#071b34] p-6 text-white">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-[#f5b400]">
+                CUSTOMER VERIFICATION
+              </p>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="text-3xl font-black">KYC Verification</h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                    Review pending customer identity submissions and approve or reject them through the protected KYC workflow.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadKycSubmissions}
+                  disabled={kycLoading}
+                  className="rounded-xl bg-[#f5b400] px-5 py-3 text-sm font-black text-[#071b34] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {kycLoading ? "Refreshing..." : "Refresh KYC"}
+                </button>
+              </div>
+            </div>
+
+            {kycError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {kycError}
+              </div>
+            )}
+
+            {kycMessage && (
+              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
+                {kycMessage}
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pending Reviews</div>
+                <div className="mt-2 text-3xl font-black text-[#071b34]">{kycSubmissions.length}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Workflow</div>
+                <div className="mt-2 text-lg font-black text-[#071b34]">Manual Review</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Documents</div>
+                <div className="mt-2 text-lg font-black text-[#071b34]">URL fields when available</div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              {kycLoading ? (
+                <div className="rounded-xl bg-slate-50 p-10 text-center text-sm font-semibold text-slate-500">
+                  Loading pending KYC submissions...
+                </div>
+              ) : kycSubmissions.length === 0 ? (
+                <div className="rounded-xl bg-slate-50 p-10 text-center">
+                  <div className="text-lg font-black text-[#071b34]">No pending KYC submissions</div>
+                  <div className="mt-2 text-sm font-semibold text-slate-500">New customer verification requests will appear here.</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {kycSubmissions.map((submission) => (
+                    <div key={submission.id} className="rounded-2xl border border-slate-200 p-5">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[#fff8dc] px-3 py-1 text-[10px] font-black uppercase text-[#8b6500]">
+                              {submission.status || "pending"}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              Submitted {formatDate(submission.submitted_at || submission.created_at)}
+                            </span>
+                          </div>
+                          <h4 className="mt-3 text-xl font-black text-[#071b34]">
+                            {submission.first_name} {submission.last_name}
+                          </h4>
+                          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                            <div><span className="text-xs font-black uppercase text-slate-400">Phone</span><div className="mt-1 font-bold text-slate-700">{submission.phone || "-"}</div></div>
+                            <div><span className="text-xs font-black uppercase text-slate-400">Date of Birth</span><div className="mt-1 font-bold text-slate-700">{submission.date_of_birth || "-"}</div></div>
+                            <div><span className="text-xs font-black uppercase text-slate-400">Gender</span><div className="mt-1 font-bold text-slate-700">{submission.gender || "-"}</div></div>
+                            <div><span className="text-xs font-black uppercase text-slate-400">ID Type</span><div className="mt-1 font-bold text-slate-700">{submission.id_type || "-"}</div></div>
+                            <div><span className="text-xs font-black uppercase text-slate-400">ID Number</span><div className="mt-1 font-bold text-slate-700">{submission.id_number || "-"}</div></div>
+                            <div><span className="text-xs font-black uppercase text-slate-400">Customer ID</span><div className="mt-1 break-all font-bold text-slate-700">{submission.user_id}</div></div>
+                          </div>
+                          <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                            <div className="text-xs font-black uppercase tracking-wider text-slate-400">Residential Address</div>
+                            <div className="mt-1 text-sm font-semibold leading-6 text-slate-700">{submission.residential_address || "-"}</div>
+                          </div>
+                        </div>
+
+                        <div className="w-full shrink-0 lg:w-72">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="text-xs font-black uppercase tracking-wider text-slate-400">Identity Documents</div>
+                            <div className="mt-3 space-y-2">
+                              {[
+                                ["ID Front", submission.id_front_url],
+                                ["ID Back", submission.id_back_url],
+                                ["Selfie", submission.selfie_url],
+                              ].map(([label, url]) => (
+                                <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+                                  <span className="text-xs font-bold text-slate-600">{label}</span>
+                                  {url ? (
+                                    <a href={url} target="_blank" rel="noreferrer" className="text-xs font-black text-[#b57e00] underline">View</a>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-slate-400">Not uploaded</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedKyc(submission);
+                              setKycRejectReason("");
+                              setKycError("");
+                              setKycMessage("");
+                            }}
+                            className="mt-3 w-full rounded-xl bg-[#071b34] px-4 py-3 text-sm font-black text-white hover:bg-[#0d2d50]"
+                          >
+                            Review Submission
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ======================================================
           PLATFORM SETTINGS
       ====================================================== */}
       {section === "platform-settings" && (
@@ -6127,42 +6320,6 @@ export default function AdminPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-lg font-black text-[#071b34]">Customer Display</h4>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">Control the customer-facing BETZONE zoom and typography. These settings do not change the admin dashboard.</p>
-                    </div>
-                    <span className="rounded-full bg-[#071b34] px-3 py-1 text-[10px] font-black text-[#f5b400]">CUSTOMER UI</span>
-                  </div>
-                  <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Interface Zoom
-                      <select value={customerZoom} onChange={(e) => setCustomerZoom(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]">
-                        {["50", "60", "70", "75", "80", "90", "100"].map((value) => <option key={value} value={value}>{value}%</option>)}
-                      </select>
-                    </label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Font Size
-                      <select value={customerFontSize} onChange={(e) => setCustomerFontSize(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]">
-                        <option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option><option value="extra-large">Extra Large</option>
-                      </select>
-                    </label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Font Family
-                      <select value={customerFontFamily} onChange={(e) => setCustomerFontFamily(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]">
-                        <option value="system">System</option><option value="inter">Inter</option><option value="roboto">Roboto</option><option value="poppins">Poppins</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Preview</div>
-                    <div className="mt-3 overflow-hidden rounded-xl">
-                      <div className="rounded-xl bg-[#071b34] p-4 text-white" style={{ transform: `scale(${Number(customerZoom) / 100})`, transformOrigin: "left center", width: `${10000 / Number(customerZoom)}%` }}>
-                        <div className="text-sm font-black">BETZONE Customer Interface</div>
-                        <div className="mt-1 text-xs text-slate-300">{customerZoom}% zoom · {customerFontSize} text · {customerFontFamily} font</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h4 className="text-lg font-black text-[#071b34]">Betting Limits</h4>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Stake<input type="number" min="0" step="0.01" value={minimumStake} onChange={(e) => setMinimumStake(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
@@ -6189,98 +6346,6 @@ export default function AdminPage() {
                       <button key={String(label)} type="button" onClick={() => setter(!value)} className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left"><span className="text-sm font-black text-[#071b34]">{label}</span><span className={`rounded-full px-3 py-1 text-[10px] font-black ${value ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{value ? 'ON' : 'OFF'}</span></button>
                     ))}
                   </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h4 className="text-lg font-black text-[#071b34]">Manual Deposits</h4>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">
-                        Configure the Mobile Money account customers use for manual betting deposits.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setManualDepositEnabled((value) => !value)}
-                      className="flex shrink-0 items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3 text-left"
-                    >
-                      <span className="text-sm font-black text-[#071b34]">Manual Deposits</span>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-black ${
-                          manualDepositEnabled
-                            ? "bg-green-100 text-green-700"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {manualDepositEnabled ? "ON" : "OFF"}
-                      </span>
-                    </button>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">
-                      Provider
-                      <select
-                        value={manualDepositProvider}
-                        onChange={(e) => setManualDepositProvider(e.target.value)}
-                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]"
-                      >
-                        <option value="MTN Mobile Money">MTN Mobile Money</option>
-                        <option value="Telecel">Telecel</option>
-                      </select>
-                    </label>
-
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">
-                      Account Name
-                      <input
-                        value={manualDepositAccountName}
-                        onChange={(e) => setManualDepositAccountName(e.target.value)}
-                        placeholder="BETZONE"
-                        required
-                        className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]"
-                      />
-                    </label>
-
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">
-                      Mobile Money Number
-                      <input
-                        value={manualDepositPhoneNumber}
-                        onChange={(e) => setManualDepositPhoneNumber(e.target.value)}
-                        placeholder="+233..."
-                        required
-                        inputMode="tel"
-                        className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]"
-                      />
-                    </label>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
-                        Customer Verification
-                      </p>
-                      <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
-                        Customers will enter the actual Mobile Money transaction ID generated by the provider.
-                      </p>
-                    </div>
-
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">
-                      Deposit Instructions
-                      <textarea
-                        value={manualDepositInstructions}
-                        onChange={(e) => setManualDepositInstructions(e.target.value)}
-                        required
-                        rows={4}
-                        placeholder="Tell customers how to send the deposit and what transaction ID to enter."
-                        className="mt-2 w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]"
-                      />
-                    </label>
-                  </div>
-
-                  {!manualDepositEnabled && (
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                      Manual deposits are currently disabled. Customers should not be shown this manual deposit method.
-                    </div>
-                  )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -6989,6 +7054,94 @@ export default function AdminPage() {
           );
         })()}
 
+      {selectedKyc && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b16]/75 p-3 backdrop-blur-sm sm:p-6">
+          <div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-slate-100 shadow-2xl">
+            <div className="shrink-0 bg-[#071b34] px-5 py-5 text-white sm:px-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#f5b400]">KYC REVIEW</p>
+                  <h2 className="mt-1 text-2xl font-black">{selectedKyc.first_name} {selectedKyc.last_name}</h2>
+                  <p className="mt-1 break-all text-xs text-slate-300">Customer ID: {selectedKyc.user_id}</p>
+                </div>
+                <button type="button" onClick={() => { if (!kycActionLoading) { setSelectedKyc(null); setKycRejectReason(""); } }} disabled={kycActionLoading} className="rounded-xl bg-white/10 px-3 py-2 text-xl font-black text-white hover:bg-white/20">×</button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="font-black text-[#071b34]">Identity Information</h3>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {[
+                      ["First Name", selectedKyc.first_name],
+                      ["Last Name", selectedKyc.last_name],
+                      ["Date of Birth", selectedKyc.date_of_birth],
+                      ["Gender", selectedKyc.gender],
+                      ["Phone", selectedKyc.phone],
+                      ["ID Type", selectedKyc.id_type],
+                      ["ID Number", selectedKyc.id_number],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</div>
+                        <div className="mt-1 break-words text-sm font-bold text-slate-700">{value || "-"}</div>
+                      </div>
+                    ))}
+                    <div className="sm:col-span-2">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Residential Address</div>
+                      <div className="mt-1 text-sm font-bold leading-6 text-slate-700">{selectedKyc.residential_address || "-"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="font-black text-[#071b34]">Submitted Documents</h3>
+                  <div className="mt-4 space-y-3">
+                    {([
+                      ["ID Front", selectedKyc.id_front_url],
+                      ["ID Back", selectedKyc.id_back_url],
+                      ["Selfie", selectedKyc.selfie_url],
+                    ] as Array<[string, string | null | undefined]>).map(([label, url]) => (
+                      <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-black text-[#071b34]">{label}</span>
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="rounded-lg bg-[#071b34] px-3 py-2 text-xs font-black text-white">Open Document</a>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400">Not uploaded</span>
+                          )}
+                        </div>
+                        {url && /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(url) && (
+                          <img src={url} alt={label} className="mt-3 max-h-56 w-full rounded-xl border border-slate-200 bg-white object-contain" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500">Rejection Reason</label>
+                <textarea
+                  value={kycRejectReason}
+                  onChange={(event) => setKycRejectReason(event.target.value)}
+                  rows={4}
+                  placeholder="Required only when rejecting this KYC submission."
+                  disabled={kycActionLoading}
+                  className="mt-2 w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#f5b400] disabled:bg-slate-50"
+                />
+              </div>
+
+              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => { setSelectedKyc(null); setKycRejectReason(""); }} disabled={kycActionLoading} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-[#071b34] disabled:opacity-50">Close</button>
+                <button type="button" onClick={() => rejectKyc(selectedKyc.id)} disabled={kycActionLoading} className="rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50">{kycActionLoading ? "Processing..." : "Reject KYC"}</button>
+                <button type="button" onClick={() => approveKyc(selectedKyc.id)} disabled={kycActionLoading} className="rounded-xl bg-[#f5b400] px-5 py-3 text-sm font-black text-[#071b34] disabled:cursor-not-allowed disabled:opacity-50">{kycActionLoading ? "Processing..." : "Approve KYC"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================
           SETTLEMENT MODAL
       ======================================================== */}
@@ -7161,11 +7314,11 @@ export default function AdminPage() {
 
       {editingMatch && (
         <div
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-0 sm:p-4"
+          className="fixed inset-0 z-[55] flex items-center justify-center bg-black/60 p-4"
           onClick={closeMatchEdit}
         >
           <div
-            className="max-h-screen w-full max-w-3xl overflow-y-auto rounded-none bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-3xl"
+            className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5 sm:px-6">
@@ -7511,111 +7664,6 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-
-      {/* ========================================================
-          MOBILE ADMIN NAVIGATION
-      ======================================================== */}
-
-      <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-slate-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-8px_30px_rgba(7,27,52,0.12)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
-          {[
-            ["dashboard", "Home", "⌂"],
-            ["bets", "Bets", "▣"],
-            ["matches", "Sports", "⚽"],
-            ["wallet", "Wallet", "₵"],
-          ].map(([key, label, icon]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => navigate(key as AdminSection)}
-              className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-1 py-1 ${
-                section === key
-                  ? "bg-[#071b34] text-[#f5b400]"
-                  : "text-slate-500"
-              }`}
-            >
-              <span className="text-base font-black leading-none">{icon}</span>
-              <span className="mt-1 text-[9px] font-black uppercase tracking-wide">{label}</span>
-            </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => setMobileAdminMenuOpen(true)}
-            className="flex min-h-14 flex-col items-center justify-center rounded-xl px-1 py-1 text-slate-500"
-          >
-            <span className="text-base font-black leading-none">☰</span>
-            <span className="mt-1 text-[9px] font-black uppercase tracking-wide">More</span>
-          </button>
-        </div>
-      </div>
-
-      {mobileAdminMenuOpen && (
-        <div
-          className="fixed inset-0 z-[80] bg-[#071b34]/60 lg:hidden"
-          onClick={() => setMobileAdminMenuOpen(false)}
-        >
-          <div
-            className="absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
-            <div className="flex items-center justify-between px-1">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#b57e00]">BETZONE ADMIN</p>
-                <h2 className="mt-1 text-xl font-black text-[#071b34]">Admin Menu</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileAdminMenuOpen(false)}
-                className="rounded-xl bg-slate-100 px-3 py-2 text-xl font-black text-slate-500"
-                aria-label="Close admin menu"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {[
-                ["dashboard", "Dashboard", "Overview"],
-                ["bets", "All Bets", "Customer bets"],
-                ["settlement", "Settlement", "Settle results"],
-                ["matches", "Matches & Odds", "Markets and odds"],
-                ["match-management", "Matches", "Manage matches"],
-                ["deposits", "Deposits", "Review deposits"],
-                ["withdrawals", "Withdrawals", "Review withdrawals"],
-                ["users", "Users", "Customers"],
-                ["wallet", "Wallet", "Balances"],
-                ["platform-settings", "Settings", "Platform controls"],
-                ["admin-security", "Security", "Admin security"],
-              ].map(([key, label, description]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => navigate(key as AdminSection)}
-                  className={`min-h-24 rounded-2xl border p-4 text-left transition ${
-                    section === key
-                      ? "border-[#f5b400] bg-[#fff8df]"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  <div className="text-sm font-black text-[#071b34]">{label}</div>
-                  <div className="mt-1 text-[11px] font-semibold leading-4 text-slate-500">{description}</div>
-                </button>
-              ))}
-
-              <a
-                href="/admin/audit-history"
-                className="min-h-24 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left"
-              >
-                <div className="text-sm font-black text-[#071b34]">Audit History</div>
-                <div className="mt-1 text-[11px] font-semibold leading-4 text-slate-500">Review admin activity</div>
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
     </main>
   );
 }
