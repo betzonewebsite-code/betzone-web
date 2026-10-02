@@ -191,6 +191,16 @@ type AdminUser = {
   } | null;
 };
 
+type AdminDashboardData = {
+  users?: number;
+  total_users?: number;
+  wallets?: number;
+  total_wallets?: number;
+  pending_deposits?: number;
+  pending_withdrawals?: number;
+  total_bets?: number;
+};
+
 type AdminKycSubmission = {
   id: string;
   user_id: string;
@@ -302,14 +312,25 @@ function formatDate(value?: string | null) {
 }
 
 function getErrorMessage(
-  data: any,
+  data: unknown,
   fallback: string,
-) {
-  return (
-    data?.message ||
-    data?.error ||
-    fallback
-  );
+): string {
+  if (data && typeof data === "object") {
+    const value = data as {
+      message?: unknown;
+      error?: unknown;
+    };
+
+    if (typeof value.message === "string" && value.message.trim()) {
+      return value.message;
+    }
+
+    if (typeof value.error === "string" && value.error.trim()) {
+      return value.error;
+    }
+  }
+
+  return fallback;
 }
 
 function getDefaultSelections(
@@ -565,7 +586,7 @@ export default function AdminPage() {
     useState(true);
 
   const [dashboardData, setDashboardData] =
-    useState<any>(null);
+    useState<AdminDashboardData | null>(null);
 
   const [bets, setBets] =
     useState<Bet[]>([]);
@@ -2364,7 +2385,22 @@ export default function AdminPage() {
       }
 
       const normalized = rawOdds.map(
-        (odd: any, index: number) => ({
+        (
+          odd: {
+            id?: string | number;
+            market_key?: string;
+            market?: string;
+            market_type?: string;
+            selection?: string;
+            selection_name?: string;
+            selectionName?: string;
+            odds?: string | number | null;
+            odd?: string | number | null;
+            line?: string | number | null;
+            sort_order?: string | number | null;
+          },
+          index: number,
+        ) => ({
           id: String(odd?.id || `${match.id}-${index}`),
           market_key: String(
             odd?.market_key ||
@@ -6270,7 +6306,7 @@ export default function AdminPage() {
               <div className="rounded-2xl bg-[#071b34] px-5 py-4 text-white">
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#f5b400]">ADMIN SETTINGS</p>
                 <h3 className="mt-1 text-2xl font-black">Platform Settings</h3>
-                <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">Configure BETZONE's global identity, betting rules, deposits, withdrawals and maintenance controls.</p>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">Configure BETZONE&apos;s global identity, betting rules, deposits, withdrawals and maintenance controls.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
