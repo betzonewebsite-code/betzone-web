@@ -103,6 +103,15 @@ type CurrentUser = {
   id: string;
   email: string;
   role: string;
+  profile?: {
+    full_name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string | null;
+    date_of_birth: string | null;
+    gender: string | null;
+    account_status: string | null;
+  } | null;
 };
 
 type Wallet = {
@@ -189,6 +198,8 @@ export default function Home() {
     useState<CustomerSettings | null>(null);
   const [customerSettingsLoading, setCustomerSettingsLoading] =
     useState(true);
+  const [customerSettingsOpen, setCustomerSettingsOpen] =
+    useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedReference = params.get("loadBet")?.trim().toUpperCase();
@@ -215,6 +226,10 @@ export default function Home() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] =
+    useState("");
+  const [firstName, setFirstName] =
+    useState("");
+  const [lastName, setLastName] =
     useState("");
   const [authError, setAuthError] =
     useState("");
@@ -378,6 +393,7 @@ export default function Home() {
         id: data.id,
         email: data.email,
         role: data.role,
+        profile: data.profile ?? null,
       });
 
       setWallet({
@@ -391,6 +407,7 @@ export default function Home() {
           id: data.id,
           email: data.email,
           role: data.role,
+          profile: data.profile ?? null,
         }),
       );
     } catch (err) {
@@ -491,6 +508,8 @@ export default function Home() {
           setAuthMode(null);
           setEmail("");
           setPassword("");
+          setFirstName("");
+          setLastName("");
           return;
         }
 
@@ -550,6 +569,12 @@ export default function Home() {
           body: JSON.stringify({
             email: email.trim(),
             password,
+            ...(authMode === "register"
+              ? {
+                  first_name: firstName.trim(),
+                  last_name: lastName.trim(),
+                }
+              : {}),
           }),
         },
       );
@@ -598,6 +623,8 @@ export default function Home() {
       setAuthSuccess("");
       setEmail("");
       setPassword("");
+      setFirstName("");
+      setLastName("");
       setAuthMode(null);
     } catch (err) {
       console.error(err);
@@ -2173,16 +2200,45 @@ export default function Home() {
 
                 {accountOpen && (
                   <div className="absolute right-0 top-full mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountOpen(false);
+                        setCustomerSettingsOpen(true);
+                      }}
+                      className="flex w-full items-center gap-3 border-b border-gray-100 px-4 py-4 text-left transition hover:bg-gray-50"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#071b34] text-white shadow-sm">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="8" r="3.25" />
+                          <path d="M5.5 19.5c.9-3.1 3.25-5 6.5-5s5.6 1.9 6.5 5" />
+                        </svg>
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[10px] font-black uppercase tracking-wide text-gray-400">
+                          Customer Settings
+                        </span>
+
+                        <span className="mt-1 block truncate text-sm font-bold text-[#071b34]">
+                          {user.email}
+                        </span>
+                      </span>
+
+                      <span className="text-lg font-black text-gray-300">
+                        ›
+                      </span>
+                    </button>
+
                     <div className="border-b border-gray-100 px-4 py-4">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
-                        Account
-                      </p>
-
-                      <p className="mt-1 truncate text-sm font-bold">
-                        {user.email}
-                      </p>
-
-                      <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                      <div className="rounded-lg bg-gray-50 p-3">
                         <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
                           Balance
                         </p>
@@ -4301,19 +4357,19 @@ export default function Home() {
                       <>
                         <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
                           Send to {
-                            customerSettings.manual_deposit_provider ||
+                            customerSettings?.manual_deposit_provider ||
                             transactionPaymentMethod
                           }
                         </p>
 
                         <p className="mt-2 text-2xl font-black tracking-wide text-[#071b34]">
-                          {customerSettings.manual_deposit_phone_number ||
+                          {customerSettings?.manual_deposit_phone_number ||
                             "Payment number unavailable"}
                         </p>
 
-                        {customerSettings.manual_deposit_account_name && (
+                        {customerSettings?.manual_deposit_account_name && (
                           <p className="mt-1 text-sm font-bold text-gray-700">
-                            {customerSettings.manual_deposit_account_name}
+                            {customerSettings?.manual_deposit_account_name}
                           </p>
                         )}
                       </>
@@ -4826,6 +4882,86 @@ export default function Home() {
         </div>
       )}
 
+
+      {/* CUSTOMER SETTINGS MODAL */}
+      {customerSettingsOpen && (
+        <div
+          className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setCustomerSettingsOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="bg-[#071b34] px-6 py-5 text-white">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f5b400] text-[#071b34]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-6 w-6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="8" r="3.25" />
+                      <path d="M5.5 19.5c.9-3.1 3.25-5 6.5-5s5.6 1.9 6.5 5" />
+                    </svg>
+                  </span>
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#f5b400]">
+                      BETZONE
+                    </p>
+                    <h2 className="mt-1 text-xl font-black">
+                      Customer Settings
+                    </h2>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCustomerSettingsOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white/70 transition hover:bg-white/20 hover:text-white"
+                  aria-label="Close customer settings"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                  Account Email
+                </p>
+                <p className="mt-1 break-all text-sm font-bold text-[#071b34]">
+                  {user?.email ?? "-"}
+                </p>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-gray-100 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                  Wallet Balance
+                </p>
+                <p className="mt-1 text-xl font-black text-[#071b34]">
+                  GHS {formatBalance(wallet?.balance ?? 0)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCustomerSettingsOpen(false)}
+                className="mt-5 w-full rounded-xl bg-[#f5b400] py-3.5 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* LOGIN / REGISTER MODAL */}
       {authMode && (
         <div
@@ -4881,6 +5017,44 @@ export default function Home() {
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
                   {authError}
                 </div>
+              )}
+
+              {authMode === "register" && (
+                <>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-wide text-gray-500">
+                    First Name
+                  </label>
+
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(event) =>
+                      setFirstName(event.target.value)
+                    }
+                    placeholder="Enter your first name"
+                    autoComplete="given-name"
+                    required
+                    disabled={authSubmitting}
+                    className="mb-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 outline-none transition focus:border-[#071b34]"
+                  />
+
+                  <label className="mb-2 block text-xs font-black uppercase tracking-wide text-gray-500">
+                    Last Name
+                  </label>
+
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(event) =>
+                      setLastName(event.target.value)
+                    }
+                    placeholder="Enter your last name"
+                    autoComplete="family-name"
+                    required
+                    disabled={authSubmitting}
+                    className="mb-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 outline-none transition focus:border-[#071b34]"
+                  />
+                </>
               )}
 
               <label className="mb-2 block text-xs font-black uppercase tracking-wide text-gray-500">
