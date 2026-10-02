@@ -2122,7 +2122,6 @@ export default function Home() {
     setLoadBetSuccess("");
   }
 
-
   const verificationStatus =
     user?.profile?.verification_status ?? "unverified";
 
@@ -2142,7 +2141,6 @@ export default function Home() {
       : verificationStatus === "rejected"
         ? "Your KYC submission was rejected. Review the reason and resubmit your information."
         : "Complete your KYC verification to unlock all BETZONE account features.";
-
 
   return (
     <>
@@ -2545,68 +2543,58 @@ export default function Home() {
                 try {
                   const formData = new FormData();
 
-formData.append(
-  "first_name",
-  kycForm.first_name.trim(),
-);
+                  formData.append(
+                    "first_name",
+                    kycForm.first_name.trim(),
+                  );
+                  formData.append(
+                    "last_name",
+                    kycForm.last_name.trim(),
+                  );
+                  formData.append(
+                    "date_of_birth",
+                    kycForm.date_of_birth,
+                  );
+                  formData.append(
+                    "gender",
+                    kycForm.gender.trim(),
+                  );
+                  formData.append(
+                    "phone",
+                    kycForm.phone.trim(),
+                  );
+                  formData.append(
+                    "residential_address",
+                    kycForm.residential_address.trim(),
+                  );
+                  formData.append(
+                    "id_type",
+                    kycForm.id_type.trim(),
+                  );
+                  formData.append(
+                    "id_number",
+                    kycForm.id_number.trim(),
+                  );
+                  formData.append(
+                    "documents",
+                    kycFrontFile,
+                  );
+                  formData.append(
+                    "documents",
+                    kycBackFile,
+                  );
+                  formData.append(
+                    "documents",
+                    kycSelfieFile,
+                  );
 
-formData.append(
-  "last_name",
-  kycForm.last_name.trim(),
-);
-
-formData.append(
-  "date_of_birth",
-  kycForm.date_of_birth,
-);
-
-formData.append(
-  "gender",
-  kycForm.gender.trim(),
-);
-
-formData.append(
-  "phone",
-  kycForm.phone.trim(),
-);
-
-formData.append(
-  "residential_address",
-  kycForm.residential_address.trim(),
-);
-
-formData.append(
-  "id_type",
-  kycForm.id_type.trim(),
-);
-
-formData.append(
-  "id_number",
-  kycForm.id_number.trim(),
-);
-
-formData.append(
-  "documents",
-  kycFrontFile,
-);
-
-formData.append(
-  "documents",
-  kycBackFile,
-);
-
-formData.append(
-  "documents",
-  kycSelfieFile,
-);
-
-const response = await fetch(`${API_URL}/kyc/submit`, {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-  body: formData,
-});
+                  const response = await fetch(`${API_URL}/kyc/submit`, {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                  });
 
                   const data = await response.json().catch(() => null);
 
@@ -2691,7 +2679,7 @@ const response = await fetch(`${API_URL}/kyc/submit`, {
                     <option value="">Select document</option>
                     <option value="ghana_card">Ghana Card</option>
                     <option value="passport">Passport</option>
-                    <option value="drivers_license">Driver's Licence</option>
+                    <option value="drivers_license">Driver&apos;s Licence</option>
                     <option value="voter_id">Voter ID</option>
                   </select>
                 </label>
