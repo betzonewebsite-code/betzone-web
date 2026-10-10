@@ -136,10 +136,12 @@ type BetSubmission = {
   potential_return: string | number;
 };
 
+
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  process.env.NEXT_PUBLIC_API_URL || "https://betzone-api-jmck.onrender.com";
 const TOKEN_KEY = "betzone_access_token";
 const USER_KEY = "betzone_user";
+
 
 export default function Home() {
   const [sports, setSports] = useState<Sport[]>([]);

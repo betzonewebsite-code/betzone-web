@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:4000";
+const API_URL = "https://betzone-api-jmck.onrender.com";
 
 export async function getSports() {
   const response = await fetch(`${API_URL}/sports`);
