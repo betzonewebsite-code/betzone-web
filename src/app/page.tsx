@@ -136,12 +136,33 @@ type BetSubmission = {
   potential_return: string | number;
 };
 
-
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://betzone-api-jmck.onrender.com";
 const TOKEN_KEY = "betzone_access_token";
 const USER_KEY = "betzone_user";
 
+// Keep future fixtures and live events visible. Past fixtures remain on the
+// customer-facing fixture list for 24 hours after scheduled kickoff, then age
+// out of the list without deleting database records or affecting My Bets.
+const FIXTURE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const LIVE_MATCH_STATUSES = new Set([
+  "live",
+  "in_play",
+  "in-play",
+  "inplay",
+  "started",
+]);
+
+function isFixtureVisible(match: Match, now = Date.now()): boolean {
+  const kickoff = new Date(match.kickoff_at).getTime();
+  if (!Number.isFinite(kickoff)) return false;
+
+  const status = String(match.status || "").trim().toLowerCase();
+  if (LIVE_MATCH_STATUSES.has(status)) return true;
+  if (kickoff >= now) return true;
+
+  return now - kickoff < FIXTURE_RETENTION_MS;
+}
 
 export default function Home() {
   const [sports, setSports] = useState<Sport[]>([]);
@@ -1081,37 +1102,31 @@ export default function Home() {
           );
         }
 
-        const data: Match[] =
-          await response.json();
+        const data: Match[] = await response.json();
+        const visibleMatches = data.filter((match) => isFixtureVisible(match));
 
-        setMatches(data);
+        // Filter before rendering and before requesting markets, so expired
+        // fixtures are not displayed or needlessly queried by the frontend.
+        setMatches(visibleMatches);
 
-        const allOdds: Odd[] = [];
-
-        for (const match of data) {
-          try {
-            const oddsResponse =
-              await fetch(
+        const oddsResults = await Promise.all(
+          visibleMatches.map(async (match) => {
+            try {
+              const oddsResponse = await fetch(
                 `${API_URL}/sports/${leagueSportKey}/leagues/${selectedLeague}/matches/${match.id}/markets`,
+                { cache: "no-store" },
               );
 
-            if (!oddsResponse.ok) {
-              continue;
+              if (!oddsResponse.ok) return [] as Odd[];
+              return (await oddsResponse.json()) as Odd[];
+            } catch (err) {
+              console.error(`Failed to load odds for match ${match.id}`, err);
+              return [] as Odd[];
             }
+          }),
+        );
 
-            const matchOdds: Odd[] =
-              await oddsResponse.json();
-
-            allOdds.push(...matchOdds);
-          } catch (err) {
-            console.error(
-              `Failed to load odds for match ${match.id}`,
-              err,
-            );
-          }
-        }
-
-        setOdds(allOdds);
+        setOdds(oddsResults.flat());
       } catch (err) {
         console.error(err);
 
@@ -1126,7 +1141,13 @@ export default function Home() {
       }
     }
 
+    // Refresh fixture statuses and markets while the page remains open.
+    // Re-running the same loader also removes fixtures as they pass the
+    // 24-hour retention window without requiring a manual page refresh.
     loadMatches();
+    const matchesRefreshTimer = window.setInterval(loadMatches, 60_000);
+
+    return () => window.clearInterval(matchesRefreshTimer);
   }, [
     selectedSport,
     selectedLeague,
@@ -1181,11 +1202,14 @@ export default function Home() {
 
       const now = Date.now();
       const threeHours = 3 * 60 * 60 * 1000;
-      const relevantMatches = leagueResults
-        .flat()
-        .filter((match) => {
-          const kickoff = new Date(match.kickoff_at).getTime();
-          if (!Number.isFinite(kickoff)) return false;
+
+const relevantMatches = leagueResults
+  .flat()
+  .filter((match) => {
+    if (!isFixtureVisible(match, now)) return false;
+
+    const kickoff = new Date(match.kickoff_at).getTime();
+    if (!Number.isFinite(kickoff)) return false;
           const status = String(match.status || "").toLowerCase();
           const liveStatus = [
             "live",
