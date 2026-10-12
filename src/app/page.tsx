@@ -1363,8 +1363,16 @@ const relevantMatches = leagueResults
   }
 
   function get1X2Odds(match: Match) {
-    const matchOdds =
-      oddsByMatch[match.id] ?? [];
+    const matchOdds = Array.from(
+  new Map(
+    [
+      ...(oddsByMatch[match.id] ?? []),
+      ...footballQuickOdds.filter(
+        (odd) => odd.match_id === match.id,
+      ),
+    ].map((odd) => [odd.id, odd]),
+  ).values(),
+);
 
     const oneXTwo =
       matchOdds.filter(
