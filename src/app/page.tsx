@@ -1458,15 +1458,7 @@ const relevantMatches = leagueResults
     return result;
   }
 
-  const playableMatches = matches.filter((match) => {
-    const matchOdds = get1X2Odds(match);
-
-    return (
-      matchOdds.home !== null ||
-      matchOdds.draw !== null ||
-      matchOdds.away !== null
-    );
-  });
+ const playableMatches = matches;
 
   function toggleBet(
     match: Match,
