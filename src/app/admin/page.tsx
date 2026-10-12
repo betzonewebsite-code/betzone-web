@@ -540,6 +540,7 @@ function getGroupLabel(
 export default function AdminPage() {
   const [section, setSection] =
     useState<AdminSection>("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Platform Settings — interface state. Backend persistence and enforcement
   // will be connected after this admin UI is in place.
@@ -3433,6 +3434,7 @@ export default function AdminPage() {
     next: AdminSection,
   ) {
     setSection(next);
+    setMobileMenuOpen(false);
 
     // Every admin section is a page-level view. Always return the
     // viewport to the top when switching sections so a newly selected
@@ -3585,17 +3587,29 @@ export default function AdminPage() {
 
         <aside className="w-full shrink-0 bg-[#071b34] text-white lg:w-64">
           <div className="sticky top-0 flex max-h-screen flex-col">
-            <div className="border-b border-white/10 px-5 py-4">
-              <div className="text-2xl font-black tracking-tight">
-                BETZONE
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <div className="text-2xl font-black tracking-tight">
+                  BETZONE
+                </div>
+
+                <div className="mt-1 text-[10px] font-black uppercase tracking-[0.25em] text-[#f5b400]">
+                  ADMIN CONTROL
+                </div>
               </div>
 
-              <div className="mt-1 text-[10px] font-black uppercase tracking-[0.25em] text-[#f5b400]">
-                ADMIN CONTROL
-              </div>
+              <button
+                type="button"
+                aria-label={mobileMenuOpen ? "Close admin navigation" : "Open admin navigation"}
+                aria-expanded={mobileMenuOpen}
+                onClick={() => setMobileMenuOpen((open) => !open)}
+                className="inline-flex items-center justify-center rounded-lg border border-white/20 px-4 py-2 text-sm font-black text-white transition hover:bg-white/10 lg:hidden"
+              >
+                {mobileMenuOpen ? "Close ✕" : "Menu ☰"}
+              </button>
             </div>
 
-            <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+            <nav className={`${mobileMenuOpen ? "block" : "hidden"} flex-1 space-y-0.5 overflow-y-auto p-3 lg:block`}>
               {[
                 [
                   "dashboard",
