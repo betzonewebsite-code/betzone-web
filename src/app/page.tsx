@@ -3182,9 +3182,9 @@ const relevantMatches = leagueResults
                           const odd = value as Odd | null;
                           return (
                             <button key={label as string} type="button" disabled={!odd} onClick={() => odd && toggleBet(match, odd)}
-                              className={`rounded-lg border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${odd && isSelected(odd.id) ? "border-black bg-black text-white" : odd ? "border-[#008b45] bg-[#008b45] text-white hover:bg-[#006b36]" : "border-gray-200 bg-gray-100 text-gray-400"}`}>
-                              <span className="block text-[9px] font-bold text-white/80">{label as string}</span>
-                              <span className="mt-0.5 block text-xs font-black text-white">{odd ? Number(odd.odds).toFixed(2) : "-"}</span>
+                              className={`rounded-lg border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${odd && isSelected(odd.id) ? "border-[#008b45] bg-[#008b45] text-white ring-1 ring-[#008b45]/20" : odd ? "border-[#c5e6cf] bg-[#e8f5ec] text-[#176b3a] hover:border-[#8bc99c] hover:bg-[#d9efdf]" : "border-gray-200 bg-gray-100 text-gray-400"}`}>
+                              <span className={`block text-[9px] font-bold ${odd && isSelected(odd.id) ? "text-white/80" : odd ? "text-[#34754b]" : "text-gray-400"}`}>{label as string}</span>
+                              <span className={`mt-0.5 block text-xs font-black ${odd && isSelected(odd.id) ? "text-white" : odd ? "text-[#176b3a]" : "text-gray-400"}`}>{odd ? Number(odd.odds).toFixed(2) : "-"}</span>
                             </button>
                           );
                         })}
@@ -3275,14 +3275,14 @@ const relevantMatches = leagueResults
                           onClick={() => odd && toggleBet(match, odd as Odd)}
                           className={`rounded-lg border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${
                             odd && isSelected((odd as Odd).id)
-                              ? "border-black bg-black text-white"
+                              ? "border-[#008b45] bg-[#008b45] text-white ring-1 ring-[#008b45]/20"
                               : odd
-                                ? "border-[#008b45] bg-[#008b45] text-white hover:bg-[#006b36]"
+                                ? "border-[#c5e6cf] bg-[#e8f5ec] text-[#176b3a] hover:border-[#8bc99c] hover:bg-[#d9efdf]"
                                 : "border-gray-200 bg-gray-100 text-gray-400"
                           }`}
                         >
-                          <span className="block text-[9px] font-bold text-white/80">{label}</span>
-                          <span className="mt-0.5 block text-xs font-black text-white">{odd ? Number((odd as Odd).odds).toFixed(2) : "-"}</span>
+                          <span className={`block text-[9px] font-bold ${odd && isSelected(odd.id) ? "text-white/80" : odd ? "text-[#34754b]" : "text-gray-400"}`}>{label}</span>
+                          <span className={`mt-0.5 block text-xs font-black ${odd && isSelected(odd.id) ? "text-white" : odd ? "text-[#176b3a]" : "text-gray-400"}`}>{odd ? Number((odd as Odd).odds).toFixed(2) : "-"}</span>
                         </button>
                         );
                       })}
@@ -3544,27 +3544,27 @@ const relevantMatches = leagueResults
                                           .odd
                                           .id,
                                       )
-                                        ? "border-black bg-black text-white shadow-sm ring-1 ring-black/20"
+                                        ? "border-[#008b45] bg-[#008b45] text-white shadow-sm ring-1 ring-[#008b45]/20"
                                         : item.odd
-                                          ? "border-[#008b45] bg-[#008b45] text-white hover:border-[#006b36] hover:shadow-sm"
+                                          ? "border-[#c5e6cf] bg-[#e8f5ec] text-[#176b3a] hover:border-[#8bc99c] hover:bg-[#d9efdf] hover:shadow-sm"
                                           : "border-gray-100 bg-gray-50 opacity-50"
                                     }`}
                                   >
                                     <div className="flex items-center justify-between gap-1">
-                                      <span className="truncate text-[10px] font-bold text-white/90">
+                                      <span className={`truncate text-[10px] font-bold ${item.odd && isSelected(item.odd.id) ? "text-white/90" : item.odd ? "text-[#34754b]" : "text-gray-400"}`}>
                                         {
                                           item.label
                                         }
                                       </span>
 
-                                      <span className="text-[9px] font-black text-white/60">
+                                      <span className={`text-[9px] font-black ${item.odd && isSelected(item.odd.id) ? "text-white/60" : item.odd ? "text-[#548563]" : "text-gray-400"}`}>
                                         {
                                           item.code
                                         }
                                       </span>
                                     </div>
 
-                                    <span className="mt-2 block text-lg font-black text-white">
+                                    <span className={`mt-2 block text-lg font-black ${item.odd && isSelected(item.odd.id) ? "text-white" : item.odd ? "text-[#176b3a]" : "text-gray-400"}`}>
                                       {item.odd
                                         ? Number(
                                             item
@@ -4663,11 +4663,11 @@ const relevantMatches = leagueResults
                                       }
                                       className={`rounded-xl border p-3 text-left transition sm:p-4 ${
                                         selected
-                                          ? "border-black bg-black text-white shadow-sm ring-1 ring-black/20"
-                                          : "border-[#008b45] bg-[#008b45] text-white hover:border-[#006b36] hover:shadow-sm"
+                                          ? "border-[#008b45] bg-[#008b45] text-white shadow-sm ring-1 ring-[#008b45]/20"
+                                          : "border-[#c5e6cf] bg-[#e8f5ec] text-[#176b3a] hover:border-[#8bc99c] hover:bg-[#d9efdf] hover:shadow-sm"
                                       }`}
                                     >
-                                      <span className="block truncate text-[10px] font-bold uppercase tracking-wide text-white/80">
+                                      <span className={`block truncate text-[10px] font-bold uppercase tracking-wide ${selected ? "text-white/80" : "text-[#34754b]"}`}>
                                         {
                                           label
                                         }
@@ -4790,8 +4790,8 @@ const relevantMatches = leagueResults
                                             }
                                             className={`m-2 rounded-lg px-3 py-2 text-center text-sm font-black transition ${
                                               selected
-                                                ? "bg-black text-white"
-                                                : "bg-[#008b45] text-white hover:bg-[#006b36]"
+                                                ? "border border-[#008b45] bg-[#008b45] text-white ring-1 ring-[#008b45]/20"
+                                                : "border border-[#c5e6cf] bg-[#e8f5ec] text-[#176b3a] hover:bg-[#d9efdf]"
                                             }`}
                                           >
                                             {Number.isFinite(
@@ -4866,16 +4866,16 @@ const relevantMatches = leagueResults
                                       className={`rounded-xl border p-3 text-left transition ${
                                         selected
                                           ? "border-[#008b45] bg-[#008b45] text-white shadow-sm ring-1 ring-[#008b45]/20"
-                                          : "border-gray-200 bg-white hover:border-[#071b34]"
+                                          : "border-[#c5e6cf] bg-[#e8f5ec] text-[#176b3a] hover:border-[#8bc99c] hover:bg-[#d9efdf]"
                                       }`}
                                     >
-                                      <span className="block truncate text-[10px] font-bold text-white/90">
+                                      <span className={`block truncate text-[10px] font-bold ${selected ? "text-white/90" : "text-[#34754b]"}`}>
                                         {
                                           odd.selection
                                         }
                                       </span>
 
-                                      <span className="mt-2 block text-lg font-black text-white">
+                                      <span className={`mt-2 block text-lg font-black ${selected ? "text-white" : "text-[#176b3a]"}`}>
                                         {Number.isFinite(
                                           numericOdds,
                                         )
