@@ -165,6 +165,7 @@ function isFixtureVisible(match: Match, now = Date.now()): boolean {
 }
 
 export default function Home() {
+  const [homepageView, setHomepageView] = useState<"football" | "today" | "live">("football");
   const [sports, setSports] = useState<Sport[]>([]);
   const [selectedSport, setSelectedSport] = useState("football");
   const [sportsMenuOpen, setSportsMenuOpen] = useState(false);
@@ -177,6 +178,10 @@ export default function Home() {
   const [footballQuickMatches, setFootballQuickMatches] = useState<Match[]>([]);
   const [footballQuickOdds, setFootballQuickOdds] = useState<Odd[]>([]);
   const [footballQuickLoading, setFootballQuickLoading] = useState(false);
+  const [todayMatches, setTodayMatches] = useState<Match[]>([]);
+  const [todayOdds, setTodayOdds] = useState<Odd[]>([]);
+  const [todayLeagueNames, setTodayLeagueNames] = useState<Record<string, string>>({});
+  const [todayMatchesLoading, setTodayMatchesLoading] = useState(false);
 
   const [betSlip, setBetSlip] = useState<BetSelection[]>([]);
   const [betSlipTab, setBetSlipTab] = useState<"betslip" | "cashout">("betslip");
@@ -1154,13 +1159,21 @@ export default function Home() {
     leagues,
   ]);
 
+  useEffect(() => {
+    loadTodayMatches();
+    const todayRefreshTimer = window.setInterval(loadTodayMatches, 60_000);
+    return () => window.clearInterval(todayRefreshTimer);
+    // This interval intentionally runs on mount and refreshes every 60 seconds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const oddsByMatch = useMemo(() => {
     const grouped: Record<
       string,
       Odd[]
     > = {};
 
-    for (const odd of odds) {
+    for (const odd of [...odds, ...todayOdds]) {
       if (!grouped[odd.match_id]) {
         grouped[odd.match_id] = [];
       }
@@ -1171,7 +1184,96 @@ export default function Home() {
     }
 
     return grouped;
-  }, [odds]);
+  }, [odds, todayOdds]);
+
+  function accraDateKey(value: string | Date): string {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Accra",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  }
+
+  async function loadTodayMatches() {
+    setTodayMatchesLoading(true);
+    try {
+      const sportsResponse = await fetch(`${API_URL}/sports`);
+      if (!sportsResponse.ok) throw new Error("Unable to load sports.");
+      const availableSports = (await sportsResponse.json()) as Sport[];
+      const activeSports = availableSports.filter((sport) => sport.is_active !== false);
+
+      const leagueGroups = await Promise.all(activeSports.map(async (sport) => {
+        try {
+          const response = await fetch(`${API_URL}/sports/${sport.sport_key}/leagues`);
+          if (!response.ok) return [] as { sportKey: string; league: League }[];
+          const sportLeagues = (await response.json()) as League[];
+          return sportLeagues
+            .filter((league) => league.is_active !== false)
+            .map((league) => ({ sportKey: sport.sport_key, league }));
+        } catch {
+          return [] as { sportKey: string; league: League }[];
+        }
+      }));
+      const allLeagues = leagueGroups.flat();
+      const leagueNameMap: Record<string, string> = {};
+      allLeagues.forEach(({ league }) => {
+        leagueNameMap[league.id] = league.country && league.country.toLowerCase() !== "unknown"
+          ? `${league.name} · ${league.country}`
+          : league.name;
+      });
+
+      const todayKey = accraDateKey(new Date());
+      const matchGroups = await Promise.all(allLeagues.map(async ({ sportKey, league }) => {
+        try {
+          const response = await fetch(`${API_URL}/sports/${sportKey}/leagues/${league.id}/matches`);
+          if (!response.ok) return [] as { sportKey: string; league: League; match: Match }[];
+          const leagueMatches = (await response.json()) as Match[];
+          return leagueMatches
+            .filter((match) => match.is_active !== false && accraDateKey(match.kickoff_at) === todayKey && isFixtureVisible(match))
+            .map((match) => ({ sportKey, league, match }));
+        } catch {
+          return [] as { sportKey: string; league: League; match: Match }[];
+        }
+      }));
+      const todayEntries = matchGroups.flat();
+
+      const entriesWithOdds = await Promise.all(todayEntries.map(async (entry) => {
+        try {
+          const response = await fetch(`${API_URL}/sports/${entry.sportKey}/leagues/${entry.league.id}/matches/${entry.match.id}/markets`);
+          if (!response.ok) return { ...entry, odds: [] as Odd[] };
+          const markets = (await response.json()) as Odd[];
+          const validOdds = markets.filter((odd) => {
+            const price = Number(odd.odds);
+            return odd.is_active !== false && Number.isFinite(price) && price > 1;
+          });
+          return { ...entry, odds: validOdds };
+        } catch {
+          return { ...entry, odds: [] as Odd[] };
+        }
+      }));
+
+      const withOdds = entriesWithOdds.filter((entry) => entry.odds.length > 0);
+      const uniqueEntries = Array.from(new Map(
+        withOdds.map((entry) => [`${entry.league.id}:${entry.match.id}`, entry]),
+      ).values());
+      uniqueEntries.sort((a, b) => new Date(a.match.kickoff_at).getTime() - new Date(b.match.kickoff_at).getTime());
+      setTodayMatches(uniqueEntries.map((entry) => entry.match));
+      setTodayOdds(uniqueEntries.flatMap((entry) => entry.odds));
+      setTodayLeagueNames(leagueNameMap);
+    } catch (err) {
+      console.error("Failed to load today's matches", err);
+      setTodayMatches([]);
+      setTodayOdds([]);
+      setTodayLeagueNames({});
+    } finally {
+      setTodayMatchesLoading(false);
+    }
+  }
 
   async function loadFootballQuickMatches() {
     try {
@@ -2785,7 +2887,7 @@ const relevantMatches = leagueResults
       )}
 
       {/* PREMIUM MOBILE NAVIGATION */}
-      <section className="border-b border-[#e7ebef] bg-white lg:hidden">
+      <section className="betzone-sports-nav border-b border-[#e7ebef] bg-white lg:hidden">
         <div className="px-3 pt-2.5">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
@@ -2891,7 +2993,7 @@ const relevantMatches = leagueResults
                 }}
                 className={`shrink-0 rounded-lg border px-3 py-1.5 text-[10px] font-black transition ${
                   selectedLeague === league.id
-                    ? "border-[#071b34] bg-[#071b34] text-white"
+                    ? "border-[#008b45] bg-[#008b45] text-white"
                     : "border-gray-200 bg-[#f7f8fa] text-gray-600"
                 }`}
               >
@@ -2908,7 +3010,7 @@ const relevantMatches = leagueResults
       </section>
 
       {/* SPORTS */}
-      <section className="hidden border-b border-gray-200 bg-white lg:block">
+      <section className="betzone-desktop-sports-nav hidden border-b border-gray-200 bg-white lg:block">
         <div className="mx-auto max-w-7xl px-4 py-3">
           <div className="relative">
             <button
@@ -2954,29 +3056,181 @@ const relevantMatches = leagueResults
         </div>
       </section>
 
-      {/* FOOTBALL LIVE + NEXT 3 HOURS */}
-      <section className="border-b border-gray-200 bg-white">
+      {/* Welcome banner and single-page section navigation */}
+      <section className="border-b border-gray-200 bg-[#f4f6f8]">
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:pt-5">
+          <div className="mb-4 overflow-hidden rounded-2xl bg-[#008b45] p-4 text-white shadow-sm sm:mb-5 sm:p-7">
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#f5b400]">
+              Welcome to BETZONE
+            </p>
+
+            <h1 className="text-2xl font-black tracking-tight sm:text-4xl">
+              Bet on the action.
+            </h1>
+
+            <p className="mt-2 max-w-xl text-sm leading-6 text-white/65">
+              Live sports, competitive odds and a fast,
+              simple betting experience.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
+                Live Odds
+              </span>
+
+              <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
+                Fast Bets
+              </span>
+
+              <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
+                Multiple Sports
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* TODAY'S MATCHES — all sports and leagues, Ghana calendar day, valid odds only */}
+      <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 sm:py-6 lg:gap-6 lg:grid-cols-[220px_minmax(0,1fr)_380px]">
+        {/* LEAGUES */}
+        <aside className="hidden h-fit overflow-hidden rounded-2xl bg-white shadow-sm lg:sticky lg:top-20 lg:block">
+          <div className="border-b border-gray-200 bg-[#071b34] px-4 py-3">
+            <h2 className="text-sm font-black uppercase tracking-wide text-white">
+              Popular
+            </h2>
+          </div>
+          <div className="max-h-[600px] overflow-y-auto">
+            {leagues.length > 0 ? (
+              leagues.map((league) => (
+                <button
+                  key={league.id}
+                  onClick={() => setSelectedLeague(league.id)}
+                  className={`flex w-full items-center justify-between border-b border-gray-200 px-4 py-3 text-left text-sm font-bold transition ${
+                    selectedLeague === league.id
+                      ? "bg-[#008b45] text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="min-w-0 truncate">{league.name}</span>
+                  <span className={`ml-2 shrink-0 text-lg leading-none ${selectedLeague === league.id ? "text-white" : "text-gray-400"}`}>
+                    ›
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="px-4 py-4 text-sm text-gray-500">
+                No leagues available yet.
+              </p>
+            )}
+          </div>
+        </aside>
+
+        {/* MAIN — section tabs and their content stay in the centre column */}
+        <section id="football-section" className="min-w-0 scroll-mt-24">
+          <nav aria-label="Homepage sections" className="mb-4 flex gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm sm:mb-5">
+            <button type="button" onClick={() => setHomepageView("football")} aria-pressed={homepageView === "football"} className={`shrink-0 rounded-lg px-4 py-3 text-xs font-black uppercase tracking-wide transition ${homepageView === "football" ? "bg-[#008b45] text-white" : "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"}`}>Football</button>
+            <button type="button" onClick={() => setHomepageView("today")} aria-pressed={homepageView === "today"} className={`shrink-0 rounded-lg px-4 py-3 text-xs font-black uppercase tracking-wide transition ${homepageView === "today" ? "bg-[#008b45] text-white" : "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"}`}>Today&apos;s Matches</button>
+            <button type="button" onClick={() => setHomepageView("live")} aria-pressed={homepageView === "live"} className={`shrink-0 rounded-lg px-4 py-3 text-xs font-black uppercase tracking-wide transition ${homepageView === "live" ? "bg-[#008b45] text-white" : "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"}`}>Football Live · Next 3 Hours</button>
+          </nav>
+
+      {homepageView === "today" && (
+      <section id="today-matches-section" className="scroll-mt-24 border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:py-5">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-3 bg-white px-4 py-3 text-gray-900 sm:px-5 border-b border-gray-200">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#008b45]" />
+                  <h2 className="text-sm font-black uppercase tracking-wide">Today&apos;s Matches</h2>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black text-gray-600">{todayMatches.length}</span>
+                </div>
+                <p className="mt-1 text-[10px] text-gray-500">All sports and leagues · matches with active odds · Ghana time</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadTodayMatches}
+                disabled={todayMatchesLoading}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {todayMatchesLoading ? "Loading" : "Refresh"}
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 p-3">
+              {todayMatches.map((match) => {
+                const matchOdds = todayOdds.filter((odd) => odd.match_id === match.id && odd.is_active !== false && Number(odd.odds) > 1);
+                const oneXTwo = get1X2Odds(match);
+                const hasOneXTwo = Boolean(oneXTwo.home || oneXTwo.draw || oneXTwo.away);
+                const status = String(match.status || "").toLowerCase();
+                const live = ["live", "in_play", "in-play", "inplay", "started"].includes(status);
+                return (
+                  <div key={`${match.league_id}:${match.id}`} className="rounded-xl border border-gray-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[9px] font-black uppercase tracking-wide ${live ? "text-red-600" : "text-gray-500"}`}>
+                        {live ? "LIVE" : new Date(match.kickoff_at).toLocaleTimeString("en-GB", { timeZone: "Africa/Accra", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="max-w-[70%] truncate text-right text-[9px] font-bold text-gray-500" title={todayLeagueNames[match.league_id] || "League"}>
+                        {todayLeagueNames[match.league_id] || "League"}
+                      </span>
+                    </div>
+                    <button type="button" onClick={() => openMatchDetails(match)} className="mt-2 w-full text-left">
+                      <div className="text-xs font-black text-gray-900">{match.home_team}</div>
+                      <div className="mt-1 text-xs font-black text-gray-900">{match.away_team}</div>
+                    </button>
+                    {hasOneXTwo ? (
+                      <div className="mt-3 grid grid-cols-3 gap-1.5">
+                        {[["1", oneXTwo.home], ["X", oneXTwo.draw], ["2", oneXTwo.away]].map(([label, value]) => {
+                          const odd = value as Odd | null;
+                          return (
+                            <button key={label as string} type="button" disabled={!odd} onClick={() => odd && toggleBet(match, odd)}
+                              className={`rounded-lg border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${odd && isSelected(odd.id) ? "border-black bg-black text-white" : odd ? "border-[#008b45] bg-[#008b45] text-white hover:bg-[#006b36]" : "border-gray-200 bg-gray-100 text-gray-400"}`}>
+                              <span className="block text-[9px] font-bold text-white/80">{label as string}</span>
+                              <span className="mt-0.5 block text-xs font-black text-white">{odd ? Number(odd.odds).toFixed(2) : "-"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => openMatchDetails(match)} className="mt-3 w-full rounded-lg bg-[#008b45] px-3 py-2 text-xs font-black text-white hover:bg-[#006b36]">
+                        View {matchOdds.length} available odds
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {!todayMatchesLoading && todayMatches.length === 0 && (
+                <div className="px-4 py-7 text-center text-xs font-semibold text-gray-500">
+                  No matches with active odds are available for today yet. This section refreshes automatically.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {homepageView === "live" && (
+      <section id="football-live-section" className="scroll-mt-24 border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 pb-4">
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between bg-[#071b34] px-4 py-3 text-white sm:px-5">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 text-gray-900 sm:px-5">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-red-500" />
-                  <h2 className="text-sm font-black">Football · Live & Next 3 Hours</h2>
+                  <h2 className="text-sm font-black text-gray-900">Football Live · Next 3 Hours</h2>
                 </div>
-                <p className="mt-1 text-[10px] text-white/60">Today’s quickest football matches to watch and bet.</p>
+                <p className="mt-1 text-[10px] text-gray-500">Today’s quickest football matches to watch and bet.</p>
               </div>
               <button
                 type="button"
                 onClick={loadFootballQuickMatches}
                 disabled={footballQuickLoading}
-                className="rounded-lg border border-white/20 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-white/10 disabled:opacity-50"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
               >
                 {footballQuickLoading ? "Loading" : "Refresh"}
               </button>
             </div>
 
-            <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="flex flex-col gap-2 p-3">
               {footballQuickMatches.slice(0, 6).map((match) => {
                 const matchOdds = footballQuickOdds.filter((odd) => odd.match_id === match.id && odd.is_active);
                 const oneXTwo = matchOdds.filter((odd) =>
@@ -2989,7 +3243,7 @@ const relevantMatches = leagueResults
                 const live = ["live", "in_play", "in-play", "inplay", "started"].includes(status);
 
                 return (
-                  <div key={match.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div key={match.id} className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className={`text-[9px] font-black uppercase tracking-wide ${live ? "text-red-600" : "text-gray-400"}`}>
                         {live ? "LIVE" : new Date(match.kickoff_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -3019,10 +3273,16 @@ const relevantMatches = leagueResults
                           type="button"
                           disabled={!odd}
                           onClick={() => odd && toggleBet(match, odd as Odd)}
-                          className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-center transition hover:border-[#071b34] disabled:cursor-not-allowed disabled:opacity-40"
+                          className={`rounded-lg border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                            odd && isSelected((odd as Odd).id)
+                              ? "border-black bg-black text-white"
+                              : odd
+                                ? "border-[#008b45] bg-[#008b45] text-white hover:bg-[#006b36]"
+                                : "border-gray-200 bg-gray-100 text-gray-400"
+                          }`}
                         >
-                          <span className="block text-[9px] font-bold text-gray-400">{label}</span>
-                          <span className="mt-0.5 block text-xs font-black text-[#071b34]">{odd ? Number((odd as Odd).odds).toFixed(2) : "-"}</span>
+                          <span className="block text-[9px] font-bold text-white/80">{label}</span>
+                          <span className="mt-0.5 block text-xs font-black text-white">{odd ? Number((odd as Odd).odds).toFixed(2) : "-"}</span>
                         </button>
                         );
                       })}
@@ -3032,7 +3292,7 @@ const relevantMatches = leagueResults
               })}
 
               {!footballQuickLoading && footballQuickMatches.length === 0 && (
-                <div className="sm:col-span-2 lg:col-span-3 px-4 py-6 text-center text-xs font-semibold text-gray-500">
+                <div className="px-4 py-6 text-center text-xs font-semibold text-gray-500">
                   No football matches are live or starting within the next 3 hours.
                 </div>
               )}
@@ -3040,72 +3300,9 @@ const relevantMatches = leagueResults
           </div>
         </div>
       </section>
+      )}
 
-      <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 sm:py-6 lg:gap-6 lg:grid-cols-[220px_minmax(0,1fr)_380px]">
-        {/* LEAGUES */}
-        <aside className="hidden h-fit overflow-hidden rounded-2xl bg-white shadow-sm lg:sticky lg:top-20 lg:block">
-          <div className="border-b border-gray-200 bg-[#071b34] px-4 py-3">
-            <h2 className="text-sm font-black uppercase tracking-wide text-white">
-              Popular
-            </h2>
-          </div>
-          <div className="max-h-[600px] overflow-y-auto">
-            {leagues.length > 0 ? (
-              leagues.map((league) => (
-                <button
-                  key={league.id}
-                  onClick={() => setSelectedLeague(league.id)}
-                  className={`flex w-full items-center justify-between border-b border-gray-200 px-4 py-3 text-left text-sm font-bold transition ${
-                    selectedLeague === league.id
-                      ? "bg-[#071b34] text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <span className="min-w-0 truncate">{league.name}</span>
-                  <span className={`ml-2 shrink-0 text-lg leading-none ${selectedLeague === league.id ? "text-[#f5b400]" : "text-gray-400"}`}>
-                    ›
-                  </span>
-                </button>
-              ))
-            ) : (
-              <p className="px-4 py-4 text-sm text-gray-500">
-                No leagues available yet.
-              </p>
-            )}
-          </div>
-        </aside>
-
-        {/* MAIN */}
-        <section className="min-w-0">
-          <div className="mb-4 overflow-hidden rounded-2xl bg-[#071b34] p-4 text-white shadow-sm sm:mb-5 sm:p-7">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#f5b400]">
-              Welcome to BETZONE
-            </p>
-
-            <h1 className="text-2xl font-black tracking-tight sm:text-4xl">
-              Bet on the action.
-            </h1>
-
-            <p className="mt-2 max-w-xl text-sm leading-6 text-white/65">
-              Live sports, competitive odds and a fast,
-              simple betting experience.
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
-                Live Odds
-              </span>
-
-              <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
-                Fast Bets
-              </span>
-
-              <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white/80">
-                Multiple Sports
-              </span>
-            </div>
-          </div>
-
+          {homepageView === "football" && (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="border-b border-gray-100 px-4 py-4 sm:px-5">
               <div className="flex items-center justify-between gap-4">
@@ -3347,27 +3544,27 @@ const relevantMatches = leagueResults
                                           .odd
                                           .id,
                                       )
-                                        ? "border-[#f5b400] bg-[#fff8dc]"
+                                        ? "border-black bg-black text-white shadow-sm ring-1 ring-black/20"
                                         : item.odd
-                                          ? "border-gray-200 bg-white hover:border-[#071b34] hover:shadow-sm"
+                                          ? "border-[#008b45] bg-[#008b45] text-white hover:border-[#006b36] hover:shadow-sm"
                                           : "border-gray-100 bg-gray-50 opacity-50"
                                     }`}
                                   >
                                     <div className="flex items-center justify-between gap-1">
-                                      <span className="truncate text-[10px] font-bold text-gray-500">
+                                      <span className="truncate text-[10px] font-bold text-white/90">
                                         {
                                           item.label
                                         }
                                       </span>
 
-                                      <span className="text-[9px] font-black text-gray-300">
+                                      <span className="text-[9px] font-black text-white/60">
                                         {
                                           item.code
                                         }
                                       </span>
                                     </div>
 
-                                    <span className="mt-2 block text-lg font-black text-gray-900">
+                                    <span className="mt-2 block text-lg font-black text-white">
                                       {item.odd
                                         ? Number(
                                             item
@@ -3415,6 +3612,7 @@ const relevantMatches = leagueResults
                 },
               )}
           </div>
+          )}
         </section>
 
         {/* MOBILE BETSLIP OVERLAY BACKDROP */}
@@ -4465,11 +4663,11 @@ const relevantMatches = leagueResults
                                       }
                                       className={`rounded-xl border p-3 text-left transition sm:p-4 ${
                                         selected
-                                          ? "border-[#f5b400] bg-[#fff8dc]"
-                                          : "border-gray-200 bg-white hover:border-[#071b34] hover:shadow-sm"
+                                          ? "border-black bg-black text-white shadow-sm ring-1 ring-black/20"
+                                          : "border-[#008b45] bg-[#008b45] text-white hover:border-[#006b36] hover:shadow-sm"
                                       }`}
                                     >
-                                      <span className="block truncate text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                                      <span className="block truncate text-[10px] font-bold uppercase tracking-wide text-white/80">
                                         {
                                           label
                                         }
@@ -4478,8 +4676,8 @@ const relevantMatches = leagueResults
                                       <span
                                         className={`mt-2 block text-lg font-black ${
                                           selected
-                                            ? "text-[#071b34]"
-                                            : "text-gray-900"
+                                            ? "text-white"
+                                            : "text-white"
                                         }`}
                                       >
                                         {Number.isFinite(
@@ -4592,8 +4790,8 @@ const relevantMatches = leagueResults
                                             }
                                             className={`m-2 rounded-lg px-3 py-2 text-center text-sm font-black transition ${
                                               selected
-                                                ? "bg-[#f5b400] text-[#071b34]"
-                                                : "bg-gray-100 text-gray-900 hover:bg-[#071b34] hover:text-white"
+                                                ? "bg-black text-white"
+                                                : "bg-[#008b45] text-white hover:bg-[#006b36]"
                                             }`}
                                           >
                                             {Number.isFinite(
@@ -4667,17 +4865,17 @@ const relevantMatches = leagueResults
                                       }
                                       className={`rounded-xl border p-3 text-left transition ${
                                         selected
-                                          ? "border-[#f5b400] bg-[#fff8dc]"
+                                          ? "border-[#008b45] bg-[#008b45] text-white shadow-sm ring-1 ring-[#008b45]/20"
                                           : "border-gray-200 bg-white hover:border-[#071b34]"
                                       }`}
                                     >
-                                      <span className="block truncate text-[10px] font-bold text-gray-500">
+                                      <span className="block truncate text-[10px] font-bold text-white/90">
                                         {
                                           odd.selection
                                         }
                                       </span>
 
-                                      <span className="mt-2 block text-lg font-black text-gray-900">
+                                      <span className="mt-2 block text-lg font-black text-white">
                                         {Number.isFinite(
                                           numericOdds,
                                         )
@@ -5648,36 +5846,160 @@ const relevantMatches = leagueResults
         </div>
       )}
       <style jsx global>{`
+        /* BETZONE sportsbook skin: visual-only overrides; application logic is unchanged. */
+        .betzone-page {
+          --bz-green: #008b45;
+          --bz-green-dark: #004d32;
+          --bz-red: #ed1026;
+          --bz-white: #ffffff;
+          background: #f3f5f6 !important;
+          color: #102a24;
+        }
+        .betzone-page > header {
+          background: linear-gradient(105deg, #004b31 0%, #00823e 45%, #003e2b 100%) !important;
+          border-bottom: 3px solid var(--bz-red);
+        }
+        .betzone-page > header > div {
+          max-width: 1600px !important;
+          min-height: 64px;
+        }
+        .betzone-page > header button[class*="bg-[#f5b400]"] {
+          background: var(--bz-red) !important;
+          color: #fff !important;
+        }
+        .betzone-page > header button,
+        .betzone-page button {
+          transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .betzone-page section.border-b.bg-white {
+          border-color: #e3e9e6 !important;
+        }
+        /* Sports navigation: red strip directly below the green header. */
+        .betzone-page .betzone-sports-nav {
+          background: #ed1026 !important;
+          border-bottom: 2px solid #c90c20 !important;
+          color: #fff !important;
+        }
+        .betzone-page .betzone-sports-nav button {
+          border-color: rgb(255 255 255 / 30%) !important;
+          color: #fff !important;
+        }
+        .betzone-page .betzone-sports-nav button[class*="bg-[#071b34]"],
+        .betzone-page .betzone-sports-nav button[class*="bg-[#008b45]"] {
+          background: #008b45 !important;
+          border-color: #fff !important;
+          color: #fff !important;
+        }
+        .betzone-page .betzone-sports-nav button[class*="bg-[#f4f6f8]"],
+        .betzone-page .betzone-sports-nav button[class*="bg-[#fff9df]"] {
+          background: rgb(255 255 255 / 12%) !important;
+        }
+        .betzone-page .betzone-desktop-sports-nav {
+          background: #ed1026 !important;
+          border-bottom: 2px solid #c90c20 !important;
+        }
+        .betzone-page .betzone-desktop-sports-nav > div > div > button {
+          border-color: rgb(255 255 255 / 35%) !important;
+          background: rgb(255 255 255 / 10%) !important;
+          color: #fff !important;
+        }
+        .betzone-page .betzone-desktop-sports-nav button span {
+          color: #fff !important;
+        }
+        .betzone-page .betzone-desktop-sports-nav button[class*="bg-[#008b45]"],
+        .betzone-page .betzone-desktop-sports-nav button[class*="bg-[#071b34]"] {
+          background: #008b45 !important;
+          color: #fff !important;
+        }
+        .betzone-page section.border-b.bg-white > div > div.overflow-hidden.rounded-2xl {
+          border-radius: 8px !important;
+          box-shadow: 0 2px 8px rgb(0 55 35 / 8%) !important;
+        }
+        .betzone-page section.border-b.bg-white > div > div.overflow-hidden.rounded-2xl > div:first-child {
+          background: linear-gradient(100deg, #004d32, #007a40) !important;
+        }
+        .betzone-page [class*="grid-cols-[220px_minmax(0,1fr)_380px]"] {
+          max-width: 1600px !important;
+          grid-template-columns: 250px minmax(0, 1fr) 330px !important;
+          gap: 16px !important;
+        }
+        .betzone-page aside.hidden.h-fit,
+        .betzone-page [class*="lg:grid-cols-[220px_minmax(0,1fr)_380px]"] aside {
+          border: 1px solid #dfe7e2;
+          border-radius: 8px !important;
+        }
+        .betzone-page aside > div:first-child,
+        .betzone-page [class*="bg-[#071b34]"] {
+          --tw-bg-opacity: 1;
+        }
+        .betzone-page aside > div:first-child {
+          background: linear-gradient(100deg, #004d32, #007a40) !important;
+        }
+        .betzone-page section.min-w-0 > div.mb-4.overflow-hidden.rounded-2xl {
+          background: linear-gradient(115deg, #004d32, #006e3b) !important;
+          border-radius: 8px !important;
+        }
+        .betzone-page .rounded-xl.border.border-gray-200.bg-gray-50,
+        .betzone-page .rounded-xl.border.border-gray-200.bg-white {
+          border-color: #dfe7e2 !important;
+        }
+        .betzone-page button[class*="border-[#071b34]"],
+        .betzone-page button[class*="bg-[#071b34]"] {
+          border-color: var(--bz-green) !important;
+        }
+        .betzone-page button[class*="bg-[#f5b400]"],
+        .betzone-page [class*="bg-[#f5b400]"] {
+          background-color: var(--bz-red) !important;
+          color: #fff !important;
+        }
+        .betzone-page button[class*="hover:border-[#071b34]"]:hover,
+        .betzone-page button[class*="hover:border-[#f5b400]"]:hover {
+          border-color: var(--bz-green) !important;
+        }
+        .betzone-page button[class*="text-[#071b34]"],
+        .betzone-page h1[class*="text-[#071b34]"],
+        .betzone-page h2[class*="text-[#071b34]"] {
+          color: #12382b;
+        }
+        .betzone-page [class*="rounded-2xl"][class*="border-gray-200"],
+        .betzone-page [class*="rounded-xl"][class*="border-gray-200"] {
+          border-color: #dfe7e2 !important;
+        }
+        .betzone-page input,
+        .betzone-page select,
+        .betzone-page textarea {
+          border-radius: 8px;
+        }
+        .betzone-page input:focus,
+        .betzone-page select:focus,
+        .betzone-page textarea:focus {
+          border-color: var(--bz-green) !important;
+          --tw-ring-color: rgb(0 139 69 / 25%) !important;
+        }
+        .betzone-page nav.fixed {
+          background: linear-gradient(100deg, #004d32, #006c3b) !important;
+          border-color: #ed1026 !important;
+        }
+        .betzone-page nav.fixed [class*="bg-[#f5b400]"] {
+          background: var(--bz-red) !important;
+          color: #fff !important;
+        }
+        /* Keep the existing mobile interface naturally responsive; do not zoom the whole page. */
+        @media (max-width: 1023px) {
+          .betzone-page [class*="grid-cols-[220px_minmax(0,1fr)_380px]"] {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
         @media (max-width: 639px) {
           .betzone-page {
-            zoom: 0.75;
-            width: 133.333333%;
+            width: 100%;
+            overflow-x: clip;
           }
-
-          .betzone-page [class*="text-2xl"] {
-            font-size: 1.25rem !important;
-            line-height: 1.35 !important;
-          }
-
-          .betzone-page [class*="text-xl"] {
-            font-size: 1.125rem !important;
-            line-height: 1.35 !important;
-          }
-
-          .betzone-page [class*="text-lg"] {
-            font-size: 1rem !important;
-            line-height: 1.35 !important;
-          }
-
-          .betzone-page [class*="text-sm"] {
-            font-size: 0.8125rem !important;
-            line-height: 1.3 !important;
-          }
-
-          .betzone-page [class*="text-base"] {
-            font-size: 0.875rem !important;
-            line-height: 1.35 !important;
-          }
+          .betzone-page [class*="text-2xl"] { font-size: 1.25rem !important; line-height: 1.35 !important; }
+          .betzone-page [class*="text-xl"] { font-size: 1.125rem !important; line-height: 1.35 !important; }
+          .betzone-page [class*="text-lg"] { font-size: 1rem !important; line-height: 1.35 !important; }
+          .betzone-page [class*="text-sm"] { font-size: 0.8125rem !important; line-height: 1.3 !important; }
+          .betzone-page [class*="text-base"] { font-size: 0.875rem !important; line-height: 1.35 !important; }
         }
       `}</style>
     </>
