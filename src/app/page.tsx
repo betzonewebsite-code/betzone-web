@@ -134,6 +134,7 @@ type BetSubmission = {
   stake: string | number;
   total_odds: string | number;
   potential_return: string | number;
+  selections: BetSelection[];
 };
 
 const API_URL =
@@ -2051,6 +2052,7 @@ const relevantMatches = leagueResults
           stake: submittedStake,
           total_odds: submittedTotalOdds,
           potential_return: submittedPotentialReturn,
+          selections: [...betSlip],
         });
       }
 
@@ -5458,93 +5460,96 @@ const relevantMatches = leagueResults
         </div>
       )}
 
-      {/* BET SUBMISSION SUCCESS */}
+      {/* BETZONE BOOKING TICKET */}
       {betSubmission && (
         <div
-          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/65 p-4"
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/75 p-0 sm:p-4"
           onClick={() => setBetSubmission(null)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+            className="flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden bg-[#1c2026] shadow-2xl sm:rounded-xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="bg-[#071b34] px-6 py-7 text-white sm:px-8">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f5b400] text-2xl font-black text-[#071b34]">
-                ✓
+            <div className="flex shrink-0 items-center justify-between gap-3 bg-[#e7192d] px-4 py-3 text-white sm:px-6">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-xl font-black italic tracking-tight">BETZONE</span>
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-bold">🇬🇭 Ghana</span>
               </div>
-
-              <h2 className="mt-4 text-center text-2xl font-black">
-                Submission Successful
-              </h2>
-
-              <p className="mt-2 text-center text-xs font-medium leading-5 text-slate-300">
-                Your bet has been accepted and your booking code is ready.
-              </p>
+              <div className="text-right text-[10px] leading-4 sm:text-xs">
+                <p className="font-black">Betslip</p>
+                <p>{new Date().toLocaleString()}</p>
+              </div>
             </div>
 
-            <div className="p-6 sm:p-8">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                    Total Stake
-                  </p>
-                  <p className="mt-1 text-xl font-black text-[#071b34]">
-                    {formatMoney(betSubmission.stake)}
-                  </p>
+            <div className="shrink-0 px-4 pb-4 pt-5 text-center text-white sm:px-6">
+              <p className="text-xs font-medium text-gray-300">Booking Code</p>
+              <p className="mt-1 break-all text-3xl font-black tracking-[0.12em] text-[#36e878] sm:text-4xl">
+                {betSubmission.bet_reference}
+              </p>
+              <div className="mx-auto mt-3 max-w-sm border-b border-[#39b86b] bg-[#30343a] px-4 py-3 text-left">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-gray-200">Total Odds</span>
+                  <strong className="text-xl font-black text-white">{Number(betSubmission.total_odds || 0).toFixed(2)}</strong>
                 </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                    Potential Win
-                  </p>
-                  <p className="mt-1 text-xl font-black text-[#071b34]">
-                    {formatMoney(betSubmission.potential_return)}
-                  </p>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-xs text-gray-300">Bonus</span>
+                  <span className="text-xs font-bold text-gray-200">Shown if applicable</span>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-4 rounded-2xl border border-[#f5b400]/40 bg-[#fffaf0] p-5">
-                <p className="text-center text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                  Booking Code
-                </p>
-
-                <p className="mt-2 text-center text-2xl font-black tracking-[0.16em] text-[#071b34]">
-                  {betSubmission.bet_reference}
-                </p>
-
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={copyBetBookingCode}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-[#071b34] shadow-sm transition hover:bg-slate-50"
-                  >
-                    <span aria-hidden="true">⧉</span>
-                    {betSubmissionCopied ? "Copied" : "Copy"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={shareBetBookingCode}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-[#071b34] shadow-sm transition hover:bg-slate-50"
-                  >
-                    <span aria-hidden="true">↗</span>
-                    {betSubmissionShared ? "Shared" : "Share"}
-                  </button>
-                </div>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-white text-[#42464d]">
+              <div className="bg-[#e5f3e9] px-4 py-2 text-sm font-semibold text-[#5c8669]">Bet Summary</div>
+              <div className="space-y-1 px-4 py-3 text-sm sm:px-6">
+                <div className="flex items-center justify-between gap-3"><span>Stake</span><strong>{formatMoney(betSubmission.stake)}</strong></div>
+                <div className="flex items-center justify-between gap-3"><span>Potential Payout</span><strong className="text-base">{formatMoney(betSubmission.potential_return)}</strong></div>
               </div>
+              <div className="bg-[#e5f3e9] px-4 py-2 text-sm font-semibold text-[#5c8669]">Selections ({betSubmission.selections.length})</div>
+              {betSubmission.selections.length ? (
+                <div>
+                  {betSubmission.selections.map((selection, index) => (
+                    <div key={`${selection.matchId}-${selection.oddId}-${index}`} className="border-b border-gray-100 px-4 py-3 sm:px-6">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-sm font-black text-[#3d4148]">{selection.selection}</p>
+                          <p className="mt-1 text-sm leading-5">{selection.homeTeam} vs {selection.awayTeam}</p>
+                          <p className="mt-1 text-xs font-bold">{selection.market}</p>
+                        </div>
+                        <span className="shrink-0 text-base font-black text-[#343840]">{Number(selection.odds).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-center text-sm text-gray-500">Your booking code was created, but selection details are unavailable in this response.</div>
+              )}
+            </div>
 
+            <div className="shrink-0 space-y-2 bg-[#1c2026] p-3 sm:p-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={copyBetBookingCode} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">{betSubmissionCopied ? "Copied!" : "Copy Code"}</button>
+                <button type="button" onClick={shareBetBookingCode} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">{betSubmissionShared ? "Shared!" : "Share Bet"}</button>
+              </div>
               <button
                 type="button"
-                onClick={() => setBetSubmission(null)}
-                className="mt-5 w-full rounded-xl bg-[#f5b400] py-3.5 text-sm font-black text-[#071b34] transition hover:bg-[#ffc62b]"
+                onClick={() => {
+                  if (betSubmission.selections.length) {
+                    setBetSlip([...betSubmission.selections]);
+                    setStake(String(betSubmission.stake));
+                    setBetError("");
+                    setBetSuccess("Selections loaded into your betslip. Check current odds before placing your bet.");
+                  }
+                  setBetSubmission(null);
+                }}
+                className="w-full rounded-md bg-[#079b3a] px-4 py-4 text-base font-black text-white shadow-[0_4px_0_#056d2a] transition hover:bg-[#078a34] active:translate-y-0.5 active:shadow-none"
               >
-                OK
+                Load to Betslip
               </button>
+              <button type="button" onClick={() => setBetSubmission(null)} className="w-full py-1 text-xs font-semibold text-gray-300 hover:text-white">Close</button>
             </div>
           </div>
         </div>
       )}
-
 
       {/* CUSTOMER SETTINGS MODAL */}
       {customerSettingsOpen && (
