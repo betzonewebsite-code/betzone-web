@@ -4890,15 +4890,24 @@ async function createMatchAndOdds() {
                       </option>
 
                       {matches
-                        .filter(Boolean)
-                        .map((match) => (
-                          <option key={match.id} value={String(match.id)}>
-                            {match.home_team} vs {match.away_team}
-                            {match.sports_leagues?.name
+                      .filter(Boolean)
+                      .filter((match) => {
+                        const matchSport = String(
+                          match.sport_key || match.sports_leagues?.sport || "").toLowerCase();
+                           return (
+                            matchesOddsSportFilter === "all" ||
+                            matchSport === matchesOddsSportFilter.toLowerCase()
+                           );
+                          })
+                          .map((match) => (
+                            <option key={match.id} value={String(match.id)}>
+                              {match.home_team} vs {match.away_team}
+                              {match.sports_leagues?.name
                               ? ` — ${match.sports_leagues.name}`
                               : ""}
-                          </option>
-                        ))}
+                              </option>
+                            ))}
+
                     </select>
 
                     <p className="text-xs text-slate-500">
