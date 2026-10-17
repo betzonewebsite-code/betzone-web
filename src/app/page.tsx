@@ -1941,10 +1941,13 @@ const relevantMatches = leagueResults
       // Build the payload from the exact active odd currently held by the
       // frontend. The database place_bet function requires odd_id, match_id,
       // market and selection to match the sports_odds row exactly.
-      const currentOdds = [
-        ...odds,
-        ...footballQuickOdds,
-      ];
+      
+const currentOdds = [
+  ...odds,
+  ...footballQuickOdds,
+  ...todayOdds,
+];
+
 
       const betSelections = betSlip.map((selected) => {
         const currentOdd = currentOdds.find(
