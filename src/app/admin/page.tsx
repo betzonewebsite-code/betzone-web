@@ -636,7 +636,11 @@ export default function AdminPage() {
 
   const [matchManagementSportFilter, setMatchManagementSportFilter] =
     useState("all");
+const [settlementSportFilter, setSettlementSportFilter] =
+  useState("all");
 
+const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
+  useState("all");
   const [selectedMatch, setSelectedMatch] =
     useState<AdminMatch | null>(null);
 
@@ -3290,31 +3294,32 @@ export default function AdminPage() {
         "void",
     ).length;
 
-  const filteredMatches =
-    useMemo(() => {
-      const query =
-        matchSearch
-          .trim()
-          .toLowerCase();
+  const filteredMatches = useMemo(() => {
+    const query = matchSearch.trim().toLowerCase();
 
-      if (!query) return matches;
+    return matches.filter((match) => {
+      const sportMatches =
+        settlementSportFilter === "all" ||
+        String(match.sport_key || "").toLowerCase() ===
+          settlementSportFilter.toLowerCase();
 
-      return matches.filter(
-        (match) =>
-          match.home_team
-            .toLowerCase()
-            .includes(query) ||
-          match.away_team
-            .toLowerCase()
-            .includes(query) ||
-          match.sports_leagues?.name
-            ?.toLowerCase()
-            .includes(query),
+      if (!sportMatches) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return (
+        match.home_team.toLowerCase().includes(query) ||
+        match.away_team.toLowerCase().includes(query) ||
+        (match.sports_leagues?.name || "")
+          .toLowerCase()
+          .includes(query)
       );
-    }, [
-      matches,
-      matchSearch,
-    ]);
+    });
+  }, [matches, matchSearch, settlementSportFilter]);
 
   const managedMatches =
     useMemo(() => {
@@ -4228,7 +4233,7 @@ export default function AdminPage() {
               "settlement" && (
               <div className="space-y-6">
 
-                <div className="rounded-2xl bg-[#071b34] p-6 text-white">
+               <div className="rounded-2xl bg-[#071b34] p-6 text-white">
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-[#f5b400]">
                     OFFICIAL SETTLEMENT
                   </p>
@@ -4242,6 +4247,44 @@ export default function AdminPage() {
                     and settle customer bets through
                     the protected server-side workflow.
                   </p>
+                </div>
+
+                {/* SETTLEMENT SPORT NAVIGATION */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">
+                    Filter by Sport
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSettlementSportFilter("all")}
+                      className={`rounded-full px-4 py-2.5 text-xs font-black transition ${
+                        settlementSportFilter === "all"
+                          ? "bg-[#f5b400] text-[#071b34]"
+                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      All Sports
+                    </button>
+
+                    {managementSports.map((sport) => (
+                      <button
+                        key={sport.key}
+                        type="button"
+                        onClick={() =>
+                          setSettlementSportFilter(sport.key)
+                        }
+                        className={`rounded-full px-4 py-2.5 text-xs font-black transition ${
+                          settlementSportFilter === sport.key
+                            ? "bg-[#f5b400] text-[#071b34] shadow-sm"
+                            : "border border-slate-200 bg-white text-slate-600 hover:border-[#f5b400] hover:bg-slate-50"
+                        }`}
+                      >
+                        {sport.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {settlementMessage && (
@@ -4521,9 +4564,55 @@ export default function AdminPage() {
                     that should be available, then publish
                     the odds into the BETZONE database.
                   </p>
+                  
+                </div>
+
+                {/* MATCHES & ODDS SPORT NAVIGATION */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">
+                    Browse by Sport
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                          setMatchesOddsSportFilter("all");
+                          setMatchManagementSportFilter("all");
+                        }}
+                      className={`rounded-full px-4 py-2.5 text-xs font-black transition ${
+                        matchesOddsSportFilter === "all"
+                          ? "bg-[#f5b400] text-[#071b34]"
+                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      All Sports
+                    </button>
+
+                    {managementSports.map((sport) => (
+                      <button
+                        key={sport.key}
+                        type="button"
+                        onClick={() => {
+                           setMatchesOddsSportFilter(sport.key);
+                           setMatchManagementSportFilter(sport.key);
+                           setSelectedSport(sport.key);
+                        }}
+                        className={`rounded-full px-4 py-2.5 text-xs font-black transition ${
+                          matchesOddsSportFilter === sport.key
+                            ? "bg-[#f5b400] text-[#071b34] shadow-sm"
+                            : "border border-slate-200 bg-white text-slate-600 hover:border-[#f5b400] hover:bg-slate-50"
+                        }`}
+                      >
+                        {sport.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {matchFormError && (
+
+              
                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
                     {matchFormError}
                   </div>
