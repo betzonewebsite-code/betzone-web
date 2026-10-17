@@ -674,7 +674,7 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
   const [editingMatchError, setEditingMatchError] =
     useState("");
 
-  const [editingMatchMessage, setEditingMatchMessage] =
+    const [editingMatchMessage, setEditingMatchMessage] =
     useState("");
 
   const [sports, setSports] =
@@ -687,6 +687,12 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
     useState<Market[]>([]);
 
   const [selectedSport, setSelectedSport] =
+    useState("");
+
+  const [matchEntryMode, setMatchEntryMode] =
+    useState<"create" | "existing">("create");
+
+  const [selectedExistingMatchId, setSelectedExistingMatchId] =
     useState("");
 
   const [selectedLeague, setSelectedLeague] =
@@ -2834,53 +2840,64 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
     );
   }
 
-  function continueToMarkets() {
-    clearMatchMessages();
+function continueToMarkets() {
+  clearMatchMessages();
 
-    if (!selectedSport) {
+  if (matchEntryMode === "existing") {
+    if (!selectedExistingMatchId) {
+      setMatchFormError("Please select an existing match.");
+      return;
+    }
+
+    const selectedMatch = matches.find(
+      (match) => String(match.id) === selectedExistingMatchId,
+    );
+
+    if (!selectedMatch) {
       setMatchFormError(
-        "Please select a sport.",
+        "The selected match could not be found. Please refresh the match list.",
       );
       return;
     }
 
-    if (!selectedLeague) {
-      setMatchFormError(
-        "Please select a league.",
-      );
-      return;
-    }
-
-    if (!homeTeam.trim()) {
-      setMatchFormError(
-        "Please enter the home team.",
-      );
-      return;
-    }
-
-    if (!awayTeam.trim()) {
-      setMatchFormError(
-        "Please enter the away team.",
-      );
-      return;
-    }
-
-    if (!kickoffDate) {
-      setMatchFormError(
-        "Please select the kickoff date.",
-      );
-      return;
-    }
-
-    if (!kickoffTime) {
-      setMatchFormError(
-        "Please select the kickoff time.",
-      );
-      return;
-    }
-
+    setHomeTeam(selectedMatch.home_team || "");
+    setAwayTeam(selectedMatch.away_team || "");
     setMatchStep(2);
+    return;
   }
+
+  if (!selectedSport) {
+    setMatchFormError("Please select a sport.");
+    return;
+  }
+
+  if (!selectedLeague) {
+    setMatchFormError("Please select a league.");
+    return;
+  }
+
+  if (!homeTeam.trim()) {
+    setMatchFormError("Please enter the home team.");
+    return;
+  }
+
+  if (!awayTeam.trim()) {
+    setMatchFormError("Please enter the away team.");
+    return;
+  }
+
+  if (!kickoffDate) {
+    setMatchFormError("Please select the kickoff date.");
+    return;
+  }
+
+  if (!kickoffTime) {
+    setMatchFormError("Please select the kickoff time.");
+    return;
+  }
+
+  setMatchStep(2);
+}
 
   function continueToOdds() {
     clearMatchMessages();
@@ -3061,83 +3078,71 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
     return "";
   }
 
-  async function createMatchAndOdds() {
-    clearMatchMessages();
+async function createMatchAndOdds() {
+  clearMatchMessages();
 
-    const validation =
-      validateOdds();
+  if (
+    matchEntryMode === "existing" &&
+    !selectedExistingMatchId
+  ) {
+    setMatchFormError("Please select an existing match.");
+    return;
+  }
 
-    if (validation) {
-      setMatchFormError(
-        validation,
-      );
-      return;
-    }
+  const validation = validateOdds();
 
-    const token = getAccessToken();
+  if (validation) {
+    setMatchFormError(validation);
+    return;
+  }
 
-    if (!token) {
-      setMatchFormError(
-        "Authentication required.",
-      );
-      return;
-    }
+  const token = getAccessToken();
 
-    try {
-      setSavingMatch(true);
+  if (!token) {
+    setMatchFormError("Authentication required.");
+    return;
+  }
 
+  try {
+    setSavingMatch(true);
+
+    let targetMatchId = selectedExistingMatchId;
+
+    if (matchEntryMode === "create") {
       const kickoffAt = new Date(
         `${kickoffDate}T${kickoffTime}`,
       );
 
-      if (
-        Number.isNaN(
-          kickoffAt.getTime(),
-        )
-      ) {
-        throw new Error(
-          "Invalid kickoff date or time.",
-        );
+      if (Number.isNaN(kickoffAt.getTime())) {
+        throw new Error("Invalid kickoff date or time.");
       }
 
-      const matchResponse =
-        await fetch(
-          `${API_URL}/admin/matches`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              sport_key:
-                selectedSport,
-              league_id:
-                selectedLeague,
-              home_team:
-                homeTeam.trim(),
-              away_team:
-                awayTeam.trim(),
-              kickoff_at:
-                kickoffAt.toISOString(),
-              status:
-                "scheduled",
-            }),
+      const matchResponse = await fetch(
+        `${API_URL}/admin/matches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify({
+            sport_key: selectedSport,
+            league_id: selectedLeague,
+            home_team: homeTeam.trim(),
+            away_team: awayTeam.trim(),
+            kickoff_at: kickoffAt.toISOString(),
+            status: "scheduled",
+          }),
+        },
+      );
 
-      const matchData =
-        await matchResponse
-          .json()
-          .catch(() => null);
+      const matchData = await matchResponse
+        .json()
+        .catch(() => null);
 
       if (!matchResponse.ok) {
         throw new Error(
-          getErrorMessage(
-            matchData,
-            "Failed to create match.",
-          ),
+          getErrorMessage(matchData, "Failed to create match."),
         );
       }
 
@@ -3152,80 +3157,64 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
         );
       }
 
-      const odds = selectedMarkets.flatMap(
-        (marketKey) => {
-          const form =
-            marketForms[
-              marketKey
-            ];
-
-          return form.selections.map(
-            (odd) => ({
-              market_key:
-                form.market.market_key,
-              selection:
-                odd.selection.trim(),
-              odds: Number(
-                odd.odds,
-              ),
-              line:
-                odd.line === ""
-                  ? null
-                  : Number(
-                      odd.line,
-                    ),
-            }),
-          );
-        },
-      );
-
-      const oddsResponse =
-        await fetch(
-          `${API_URL}/admin/matches/${createdMatch.id}/odds`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              odds,
-            }),
-          },
-        );
-
-      const oddsData =
-        await oddsResponse
-          .json()
-          .catch(() => null);
-
-      if (!oddsResponse.ok) {
-        throw new Error(
-          getErrorMessage(
-            oddsData,
-            "Match was created but odds could not be published.",
-          ),
-        );
-      }
-
-      setMatchFormSuccess(
-        "Match and odds created successfully.",
-      );
-
-      resetMatchForm();
-
-      await loadMatches();
-    } catch (error) {
-      setMatchFormError(
-        error instanceof Error
-          ? error.message
-          : "Failed to create match and odds.",
-      );
-    } finally {
-      setSavingMatch(false);
+      targetMatchId = String(createdMatch.id);
     }
+
+    const odds = selectedMarkets.flatMap((marketKey) => {
+      const form = marketForms[marketKey];
+
+      return form.selections.map((odd) => ({
+        market_key: form.market.market_key,
+        selection: odd.selection.trim(),
+        odds: Number(odd.odds),
+        line: odd.line === "" ? null : Number(odd.line),
+      }));
+    });
+
+    const oddsResponse = await fetch(
+      `${API_URL}/admin/matches/${encodeURIComponent(targetMatchId)}/odds`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ odds }),
+      },
+    );
+
+    const oddsData = await oddsResponse
+      .json()
+      .catch(() => null);
+
+    if (!oddsResponse.ok) {
+      throw new Error(
+        getErrorMessage(
+          oddsData,
+          "Odds could not be published.",
+        ),
+      );
+    }
+
+       resetMatchForm();
+
+    setMatchFormSuccess(
+      matchEntryMode === "existing"
+        ? "Odds published successfully for the existing match."
+        : "Match and odds created successfully.",
+    );
+
+  await loadMatches();
+  } catch (error) {
+    setMatchFormError(
+      error instanceof Error
+        ? error.message
+        : "Failed to publish match and odds.",
+    );
+  } finally {
+    setSavingMatch(false);
   }
+}
 
   const filteredBets =
     useMemo(() => {
@@ -4563,8 +4552,55 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
                     Configure a match, select the markets
                     that should be available, then publish
                     the odds into the BETZONE database.
+
                   </p>
-                  
+                </div>
+
+                {/* MATCH ENTRY MODE */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMatchEntryMode("create");
+                      setSelectedExistingMatchId("");
+                      setMatchStep(1);
+                      clearMatchMessages();
+                    }}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      matchEntryMode === "create"
+                        ? "border-[#f5b400] bg-[#fff8dc]"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <span className="block text-sm font-black text-[#071b34]">
+                      Create New Match
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Create a fixture and publish its odds.
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMatchEntryMode("existing");
+                      setSelectedExistingMatchId("");
+                      setMatchStep(1);
+                      clearMatchMessages();
+                    }}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      matchEntryMode === "existing"
+                        ? "border-[#f5b400] bg-[#fff8dc]"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <span className="block text-sm font-black text-[#071b34]">
+                      Add Odds to Existing Match
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      Select an existing fixture without creating another.
+                    </span>
+                  </button>
                 </div>
 
                 {/* MATCHES & ODDS SPORT NAVIGATION */}
@@ -4665,7 +4701,8 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
                 {matchStep ===
                   1 && (
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="grid gap-5 lg:grid-cols-2">
+                    {matchEntryMode === "create" ? (
+                      <div className="grid gap-5 lg:grid-cols-2">
                       <div>
                         <label className="text-xs font-black uppercase tracking-wider text-slate-500">
                           Sport
@@ -4829,8 +4866,46 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
                           className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#f5b400]"
                         />
                       </div>
-                    </div>
+                       </div>
+                 ) : (
+                  <div className="space-y-3">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-500">
+                      Select Existing Match
+                    </label>
 
+                    <select
+                      value={selectedExistingMatchId}
+                      onChange={(event) => {
+                        setSelectedExistingMatchId(event.target.value);
+                      }}
+                      disabled={matchesLoading || matches.length === 0}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]"
+                    >
+                      <option value="">
+                        {matchesLoading
+                          ? "Loading matches..."
+                          : matches.length === 0
+                            ? "No matches available"
+                            : "Choose an existing match"}
+                      </option>
+
+                      {matches
+                        .filter(Boolean)
+                        .map((match) => (
+                          <option key={match.id} value={String(match.id)}>
+                            {match.home_team} vs {match.away_team}
+                            {match.sports_leagues?.name
+                              ? ` — ${match.sports_leagues.name}`
+                              : ""}
+                          </option>
+                        ))}
+                    </select>
+
+                    <p className="text-xs text-slate-500">
+                      Select an existing fixture to publish its odds without creating a duplicate match.
+                    </p>
+                  </div>
+                )}
                     <div className="mt-6 flex justify-end">
                       <button
                         type="button"
@@ -5200,9 +5275,13 @@ const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
                         }
                         className="rounded-xl bg-[#f5b400] px-7 py-3 text-sm font-black text-[#071b34] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {savingMatch
-                          ? "Creating Match..."
-                          : "Create Match & Publish Odds"}
+                       {savingMatch
+                         ? matchEntryMode === "existing"
+                         ? "Publishing Odds..."
+                         : "Creating Match..."
+                         : matchEntryMode === "existing"
+                          ? "Publish Odds to Existing Match"
+                         : "Create Match & Publish Odds"}
                       </button>
                     </div>
                   </div>
