@@ -636,10 +636,18 @@ export default function AdminPage() {
 
   const [matchManagementSportFilter, setMatchManagementSportFilter] =
     useState("all");
-const [settlementSportFilter, setSettlementSportFilter] =
-  useState("all");
+  const [matchManagementLeagueFilter, setMatchManagementLeagueFilter] =
+    useState("all");
+  const [managementLeagues, setManagementLeagues] =
+    useState<League[]>([]);
+  const [managementLeaguesLoading, setManagementLeaguesLoading] =
+    useState(false);
+  const [settlementSportFilter, setSettlementSportFilter] =
+    useState("all");
 
 const [matchesOddsSportFilter, setMatchesOddsSportFilter] =
+  useState("all");
+const [matchesOddsLeagueFilter, setMatchesOddsLeagueFilter] =
   useState("all");
   const [selectedMatch, setSelectedMatch] =
     useState<AdminMatch | null>(null);
@@ -3327,6 +3335,15 @@ async function createMatchAndOdds() {
           return false;
         }
 
+        const leagueMatches =
+          matchManagementLeagueFilter === "all" ||
+          String(match.sports_leagues?.id || match.league_id || "") ===
+            matchManagementLeagueFilter;
+
+        if (!leagueMatches) {
+          return false;
+        }
+
         if (!query) {
           return true;
         }
@@ -3347,6 +3364,7 @@ async function createMatchAndOdds() {
       matches,
       matchSearch,
       matchManagementSportFilter,
+      matchManagementLeagueFilter,
     ]);
 
   const managementSports =
@@ -3485,6 +3503,98 @@ async function createMatchAndOdds() {
       loadPlatformSettings();
     }
   }
+
+  async function loadManagementLeagues(sportKey: string) {
+    if (sportKey === "all") {
+      try {
+        setManagementLeaguesLoading(true);
+        const sportKeys = Array.from(
+          new Set(sports.map((sport) => String(sport.sport_key || "").toLowerCase()).filter(Boolean)),
+        );
+        const leagueLists = await Promise.all(
+          sportKeys.map(async (key) => {
+            try {
+              const response = await fetch(`${API_URL}/sports/${encodeURIComponent(key)}/leagues`);
+              if (!response.ok) return [];
+              const data = await response.json().catch(() => null);
+              return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+            } catch {
+              return [];
+            }
+          }),
+        );
+        const byId = new Map<string, League>();
+        leagueLists.flat().forEach((league: League) => {
+          if (league?.id && league?.name) {
+            byId.set(String(league.id), { ...league, id: String(league.id) });
+          }
+        });
+        // Keep leagues visible if a stored match references one not returned by the league endpoints.
+        matches.forEach((match) => {
+          const id = String(match.sports_leagues?.id || match.league_id || "");
+          const name = String(match.sports_leagues?.name || "").trim();
+          if (id && name && !byId.has(id)) {
+            byId.set(id, {
+              id,
+              name,
+              country: match.sports_leagues?.country || null,
+              sport: match.sports_leagues?.sport || match.sport_key || null,
+            });
+          }
+        });
+        setManagementLeagues(Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name)));
+      } catch {
+        setManagementLeagues([]);
+      } finally {
+        setManagementLeaguesLoading(false);
+      }
+      return;
+    }
+
+    try {
+      setManagementLeaguesLoading(true);
+      const response = await fetch(`${API_URL}/sports/${encodeURIComponent(sportKey)}/leagues`);
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data, "Failed to load leagues for this sport."));
+      }
+      const array = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+      const byId = new Map<string, League>();
+      array.forEach((league: League) => {
+        if (league?.id && league?.name) {
+          byId.set(String(league.id), { ...league, id: String(league.id) });
+        }
+      });
+      matches.forEach((match) => {
+        const matchSport = String(match.sport_key || match.sports_leagues?.sport || "").toLowerCase();
+        const id = String(match.sports_leagues?.id || match.league_id || "");
+        const name = String(match.sports_leagues?.name || "").trim();
+        if (matchSport === sportKey.toLowerCase() && id && name && !byId.has(id)) {
+          byId.set(id, {
+            id,
+            name,
+            country: match.sports_leagues?.country || null,
+            sport: match.sports_leagues?.sport || match.sport_key || null,
+          });
+        }
+      });
+      setManagementLeagues(Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error) {
+      setManagementLeagues([]);
+      setMatchesError(error instanceof Error ? error.message : "Failed to load leagues for this sport.");
+    } finally {
+      setManagementLeaguesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setMatchManagementLeagueFilter("all");
+    loadManagementLeagues(matchManagementSportFilter);
+  }, [matchManagementSportFilter, sports]);
 
   useEffect(() => {
     loadPlatformSettings();
@@ -4615,6 +4725,7 @@ async function createMatchAndOdds() {
                       onClick={() => {
                           setMatchesOddsSportFilter("all");
                           setMatchManagementSportFilter("all");
+                          setMatchesOddsLeagueFilter("all");
                         }}
                       className={`rounded-full px-4 py-2.5 text-xs font-black transition ${
                         matchesOddsSportFilter === "all"
@@ -4632,6 +4743,7 @@ async function createMatchAndOdds() {
                         onClick={() => {
                            setMatchesOddsSportFilter(sport.key);
                            setMatchManagementSportFilter(sport.key);
+                           setMatchesOddsLeagueFilter("all");
                            setSelectedSport(sport.key);
                         }}
                         className={`rounded-full px-4 py-2.5 text-xs font-black transition ${
@@ -4643,6 +4755,54 @@ async function createMatchAndOdds() {
                         {sport.name}
                       </button>
                     ))}
+                  </div>
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    <p className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">
+                      Browse by League
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMatchesOddsLeagueFilter("all")}
+                        className={`rounded-full px-3 py-2 text-xs font-black transition ${
+                          matchesOddsLeagueFilter === "all"
+                            ? "bg-[#071b34] text-white"
+                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        All Leagues
+                      </button>
+                      {managementLeagues.map((league) => {
+                        const count = matches.filter((match) => {
+                          const matchSport = String(match.sport_key || match.sports_leagues?.sport || "").toLowerCase();
+                          const sportMatches = matchesOddsSportFilter === "all" || matchSport === matchesOddsSportFilter.toLowerCase();
+                          const leagueId = String(match.sports_leagues?.id || match.league_id || "");
+                          return sportMatches && leagueId === String(league.id);
+                        }).length;
+                        return (
+                          <button
+                            key={league.id}
+                            type="button"
+                            onClick={() => setMatchesOddsLeagueFilter(String(league.id))}
+                            className={`rounded-xl px-3 py-2.5 text-xs font-black transition ${
+                              matchesOddsLeagueFilter === String(league.id)
+                                ? "bg-[#f5b400] text-[#071b34] shadow-sm"
+                                : "border border-slate-200 bg-white text-slate-600 hover:border-[#f5b400] hover:bg-slate-50"
+                            }`}
+                          >
+                            {league.name}
+                            {league.country ? <span className="ml-1 font-medium text-slate-400">· {league.country}</span> : null}
+                            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">{count}</span>
+                          </button>
+                        );
+                      })}
+                      {!managementLeaguesLoading && managementLeagues.length === 0 && (
+                        <p className="py-2 text-xs text-slate-500">No leagues available for this sport.</p>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Select a league, then choose “Add Odds to Existing Match” to find its fixtures.
+                    </p>
                   </div>
                 </div>
 
@@ -4894,10 +5054,12 @@ async function createMatchAndOdds() {
                       .filter((match) => {
                         const matchSport = String(
                           match.sport_key || match.sports_leagues?.sport || "").toLowerCase();
-                           return (
+                           const sportMatches =
                             matchesOddsSportFilter === "all" ||
-                            matchSport === matchesOddsSportFilter.toLowerCase()
-                           );
+                            matchSport === matchesOddsSportFilter.toLowerCase();
+                           const matchLeagueId = String(match.sports_leagues?.id || match.league_id || "");
+                           const leagueMatches = matchesOddsLeagueFilter === "all" || matchLeagueId === matchesOddsLeagueFilter;
+                           return sportMatches && leagueMatches;
                           })
                           .map((match) => (
                             <option key={match.id} value={String(match.id)}>
@@ -5354,9 +5516,10 @@ async function createMatchAndOdds() {
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        setMatchManagementSportFilter("all")
-                      }
+                      onClick={() => {
+                        setMatchManagementSportFilter("all");
+                        setMatchManagementLeagueFilter("all");
+                      }}
                       className={`rounded-full px-4 py-2 text-xs font-black transition ${
                         matchManagementSportFilter === "all"
                           ? "bg-[#f5b400] text-[#071b34]"
@@ -5377,11 +5540,10 @@ async function createMatchAndOdds() {
                         <button
                           key={sport.key}
                           type="button"
-                          onClick={() =>
-                            setMatchManagementSportFilter(
-                              sport.key,
-                            )
-                          }
+                          onClick={() => {
+                            setMatchManagementSportFilter(sport.key);
+                            setMatchManagementLeagueFilter("all");
+                          }}
                           className={`rounded-xl px-4 py-2.5 text-xs font-black transition ${
                             matchManagementSportFilter === sport.key
                               ? "bg-[#f5b400] text-[#071b34] shadow-sm"
@@ -5403,6 +5565,57 @@ async function createMatchAndOdds() {
                     })}
                   </div>
 
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h4 className="text-sm font-black text-[#071b34]">League Navigation</h4>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Choose a league to show its stored matches, then use Edit to add or update odds.
+                        </p>
+                      </div>
+                      {managementLeaguesLoading && (
+                        <span className="text-xs font-semibold text-slate-500">Loading leagues…</span>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMatchManagementLeagueFilter("all")}
+                        className={`rounded-full px-3 py-2 text-xs font-black transition ${
+                          matchManagementLeagueFilter === "all"
+                            ? "bg-[#071b34] text-white"
+                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        All Leagues
+                      </button>
+                      {managementLeagues.map((league) => {
+                        const count = matches.filter((match) =>
+                          String(match.sport_key || "").toLowerCase() === matchManagementSportFilter.toLowerCase() || matchManagementSportFilter === "all"
+                        ).filter((match) => String(match.sports_leagues?.id || match.league_id || "") === String(league.id)).length;
+                        return (
+                          <button
+                            key={league.id}
+                            type="button"
+                            onClick={() => setMatchManagementLeagueFilter(String(league.id))}
+                            className={`rounded-xl px-3 py-2.5 text-xs font-black transition ${
+                              matchManagementLeagueFilter === String(league.id)
+                                ? "bg-[#f5b400] text-[#071b34] shadow-sm"
+                                : "border border-slate-200 bg-white text-slate-600 hover:border-[#f5b400] hover:bg-slate-50"
+                            }`}
+                          >
+                            {league.name}
+                            {league.country ? <span className="ml-1 font-medium text-slate-400">· {league.country}</span> : null}
+                            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">{count}</span>
+                          </button>
+                        );
+                      })}
+                      {!managementLeaguesLoading && managementLeagues.length === 0 && (
+                        <p className="py-2 text-xs text-slate-500">No leagues were returned for this sport.</p>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                     <input
                       value={matchSearch}
@@ -5419,13 +5632,13 @@ async function createMatchAndOdds() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="text-xl font-black text-[#071b34]">
-                        {matchManagementSportFilter === "all"
-                          ? "All Matches"
-                          : managementSports.find(
-                              (sport) =>
-                                sport.key ===
-                                matchManagementSportFilter,
-                            )?.name || "Matches"}
+                        {matchManagementLeagueFilter !== "all"
+                          ? managementLeagues.find((league) => String(league.id) === matchManagementLeagueFilter)?.name || "Selected League Matches"
+                          : matchManagementSportFilter === "all"
+                            ? "All Matches"
+                            : managementSports.find(
+                                (sport) => sport.key === matchManagementSportFilter,
+                              )?.name || "Matches"}
                       </h3>
 
                       <p className="mt-1 text-sm text-slate-500">
