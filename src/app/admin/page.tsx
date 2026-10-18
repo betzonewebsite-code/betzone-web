@@ -570,15 +570,18 @@ function getDefaultSelections(
     "No",
   ];
 }
-
 function marketNeedsLine(
   marketKey: string,
 ) {
   const key = marketKey.toLowerCase();
 
-  // Three-way handicap presets include the handicap in the selection label
-  // (for example, "Home (0:1)") because the database line column is Decimal.
-  if (key === "three-way-handicap" || key === "first-half-handicap") {
+  // These markets do not need a separate line field.
+  if (
+    key === "double-chance" ||
+    key === "first-half-double-chance" ||
+    key === "three-way-handicap" ||
+    key === "first-half-handicap"
+  ) {
     return false;
   }
 
