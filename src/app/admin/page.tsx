@@ -333,6 +333,44 @@ function getErrorMessage(
   return fallback;
 }
 
+const BETZONE_EXTRA_MARKETS: Market[] = [
+  { market_key: "1x2-1up", market_name: "1X2 — Home Win / 1 Up", market_group: "Match Result", sort_order: 10, is_active: true },
+  { market_key: "1x2-2up", market_name: "1X2 — Away Win / 2 Up", market_group: "Match Result", sort_order: 11, is_active: true },
+  { market_key: "1x2-never-down", market_name: "1X2 — Never Down", market_group: "Match Result", sort_order: 12, is_active: true },
+  { market_key: "double-chance", market_name: "Double Chance (Home or Draw / Home or Away / Draw or Away)", market_group: "Match Result", sort_order: 20, is_active: true },
+  { market_key: "first-goal", market_name: "First Goal", market_group: "Goals", sort_order: 30, is_active: true },
+  { market_key: "total-goals", market_name: "Total Goals — Over/Under", market_group: "Goals", sort_order: 31, is_active: true },
+  { market_key: "asian-ou", market_name: "Asian Total Goals — Over/Under", market_group: "Goals", sort_order: 32, is_active: true },
+  { market_key: "home-team-over-under", market_name: "Home Team Total Goals — Over/Under", market_group: "Team Goals", sort_order: 40, is_active: true },
+  { market_key: "away-team-over-under", market_name: "Away Team Total Goals — Over/Under", market_group: "Team Goals", sort_order: 41, is_active: true },
+  { market_key: "gg-ng", market_name: "Both Teams to Score (Yes / No)", market_group: "Goals", sort_order: 42, is_active: true },
+  { market_key: "any-team-score-2-in-row", market_name: "Any Team to Score 2+ Goals in a Row", market_group: "Consecutive Goals", sort_order: 50, is_active: true },
+  { market_key: "any-team-score-3-in-row", market_name: "Any Team to Score 3+ Goals in a Row", market_group: "Consecutive Goals", sort_order: 51, is_active: true },
+  { market_key: "home-score-2-in-row", market_name: "Home Team to Score 2+ Goals in a Row", market_group: "Consecutive Goals", sort_order: 52, is_active: true },
+  { market_key: "home-score-3-in-row", market_name: "Home Team to Score 3+ Goals in a Row", market_group: "Consecutive Goals", sort_order: 53, is_active: true },
+  { market_key: "away-score-2-in-row", market_name: "Away Team to Score 2+ Goals in a Row", market_group: "Consecutive Goals", sort_order: 54, is_active: true },
+  { market_key: "away-score-3-in-row", market_name: "Away Team to Score 3+ Goals in a Row", market_group: "Consecutive Goals", sort_order: 55, is_active: true },
+  { market_key: "draw-no-bet", market_name: "Draw No Bet", market_group: "Match Result", sort_order: 60, is_active: true },
+  { market_key: "correct-score", market_name: "Correct Score", market_group: "Goals", sort_order: 61, is_active: true },
+  { market_key: "ht-ft", market_name: "Half-Time / Full-Time", market_group: "Half-Time", sort_order: 62, is_active: true },
+  { market_key: "first-half-ou", market_name: "First-Half Total Goals — Over/Under", market_group: "First Half", sort_order: 70, is_active: true },
+  { market_key: "first-half-double-chance", market_name: "First-Half Double Chance", market_group: "First Half", sort_order: 71, is_active: true },
+  { market_key: "first-half-1x2", market_name: "First-Half Result (Home / Draw / Away)", market_group: "First Half", sort_order: 72, is_active: true },
+  { market_key: "first-half-handicap", market_name: "First-Half 3-Way Handicap", market_group: "First Half", sort_order: 73, is_active: true },
+  { market_key: "second-half-1x2", market_name: "Second-Half Result (Home / Draw / Away)", market_group: "Second Half", sort_order: 80, is_active: true },
+  { market_key: "second-half-ou", market_name: "Second-Half Total Goals — Over/Under", market_group: "Second Half", sort_order: 81, is_active: true },
+  { market_key: "three-way-handicap", market_name: "3-Way Handicap (Home / Draw / Away)", market_group: "Handicap", sort_order: 90, is_active: true },
+  { market_key: "asian-handicap", market_name: "Asian Handicap", market_group: "Handicap", sort_order: 91, is_active: true },
+  { market_key: "corners-1x2", market_name: "Corners Result (Home / Draw / Away)", market_group: "Corners", sort_order: 100, is_active: true },
+  { market_key: "first-corner", market_name: "First Corner (Home / None / Away)", market_group: "Corners", sort_order: 101, is_active: true },
+  { market_key: "last-corner", market_name: "Last Corner (Home / None / Away)", market_group: "Corners", sort_order: 102, is_active: true },
+  { market_key: "corner-handicap", market_name: "Corner Handicap", market_group: "Corners", sort_order: 103, is_active: true },
+  { market_key: "home-team-total-corners", market_name: "Home Team Total Corners — Over/Under", market_group: "Corners", sort_order: 104, is_active: true },
+  { market_key: "away-team-total-corners", market_name: "Away Team Total Corners — Over/Under", market_group: "Corners", sort_order: 105, is_active: true },
+  { market_key: "total-corners-ou", market_name: "Total Corners — Over/Under", market_group: "Corners", sort_order: 106, is_active: true },
+  { market_key: "corners-odd-even", market_name: "Odd / Even Corners", market_group: "Corners", sort_order: 107, is_active: true },
+];
+
 function getDefaultSelections(
   marketKey: string,
   homeTeam: string,
@@ -351,13 +389,34 @@ function getDefaultSelections(
     ];
   }
 
-  if (key === "double-chance") {
-    return [
-      "1X",
-      "12",
-      "X2",
-    ];
+  if (key === "double-chance" || key === "first-half-double-chance") {
+    return ["Home or Draw (1X)", "Home or Away (12)", "Draw or Away (X2)"];
   }
+
+  if (key === "1x2-1up" || key === "1x2-2up" || key === "1x2-never-down" || key.includes("score-2-in-row") || key.includes("score-3-in-row")) {
+    return ["Yes", "No"];
+  }
+
+  if (key === "first-goal" || key === "first-corner" || key === "last-corner") {
+    return [homeTeam || "Home", "No Goal / None", awayTeam || "Away"];
+  }
+
+  if (key === "three-way-handicap" || key === "first-half-handicap") {
+    const home = homeTeam || "Home";
+    const away = awayTeam || "Away";
+    const handicapLines = ["0:1", "0:2", "0:3", "0:4", "1:0", "2:0", "3:0", "4:0"];
+    return handicapLines.flatMap((line) => [
+      `${home} (${line})`,
+      `Draw (${line})`,
+      `${away} (${line})`,
+    ]);
+  }
+
+  if (key === "corners-1x2" || key === "second-half-1x2") {
+    return [homeTeam || "Home", "Draw", awayTeam || "Away"];
+  }
+
+  if (key === "corners-odd-even") return ["Odd", "Even"];
 
   if (key === "draw-no-bet") {
     return [
@@ -366,15 +425,14 @@ function getDefaultSelections(
     ];
   }
 
-  if (
-    key === "ou" ||
-    key === "total-goals" ||
-    key === "first-half-ou"
-  ) {
-    return [
-      "Over",
-      "Under",
-    ];
+  if (["ou", "total-goals", "first-half-ou", "asian-ou", "second-half-ou", "home-team-over-under", "away-team-over-under", "home-team-total-corners", "away-team-total-corners", "total-corners-ou"].includes(key)) {
+    return ["Over", "Under"];
+  }
+
+  if (key === "asian-handicap" || key === "corner-handicap") return ["Home", "Away"];
+
+  if (key === "correct-score") {
+    return ["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2", "2-2", "3-0", "0-3", "3-1", "1-3", "3-2", "2-3", "Other"];
   }
 
   if (
@@ -517,6 +575,12 @@ function marketNeedsLine(
   marketKey: string,
 ) {
   const key = marketKey.toLowerCase();
+
+  // Three-way handicap presets include the handicap in the selection label
+  // (for example, "Home (0:1)") because the database line column is Decimal.
+  if (key === "three-way-handicap" || key === "first-half-handicap") {
+    return false;
+  }
 
   return (
     key.includes("ou") ||
@@ -1503,7 +1567,15 @@ const [matchesOddsLeagueFilter, setMatchesOddsLeagueFilter] =
           ? data.data
           : [];
 
-      setMarkets(array);
+      const apiMarkets = array as Market[];
+      const byKey = new Map<string, Market>();
+      [...BETZONE_EXTRA_MARKETS, ...apiMarkets].forEach((market) => {
+        if (market?.market_key && market.is_active !== false) byKey.set(market.market_key, market);
+      });
+      setMarkets(Array.from(byKey.values()).sort((a, b) =>
+        Number(a.sort_order ?? 9999) - Number(b.sort_order ?? 9999) ||
+        a.market_name.localeCompare(b.market_name)
+      ));
     } catch (error) {
       setMatchFormError(
         error instanceof Error
@@ -5097,16 +5169,18 @@ async function createMatchAndOdds() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-xl font-black text-[#071b34]">
-                          Select Markets
+                          Choose betting markets
                         </h3>
 
-                        <p className="mt-1 text-sm text-slate-500">
-                          Choose only the markets you want
-                          to publish for this match.
+                        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                          Select the market types customers should see for this fixture. Choose a full category or individual markets, then enter each outcome and its decimal odds on the next step.
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-[#fff8dc] px-3 py-2 text-xs font-extrabold text-[#715000]">
+                          {selectedMarkets.length} selected
+                        </span>
                         <button
                           type="button"
                           onClick={
@@ -5146,10 +5220,15 @@ async function createMatchAndOdds() {
                               }
                               className="rounded-2xl border border-slate-200 p-4"
                             >
-                              <div className="mb-3 flex items-center justify-between">
-                                <h4 className="text-sm font-black uppercase tracking-wider text-[#071b34]">
-                                  {group}
-                                </h4>
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                <div>
+                                  <h4 className="text-sm font-black uppercase tracking-wider text-[#071b34]">
+                                    {group}
+                                  </h4>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {groupMarkets.filter((market) => selectedMarkets.includes(market.market_key)).length} of {groupMarkets.length} markets selected
+                                  </p>
+                                </div>
 
                                 <button
                                   type="button"
@@ -5189,10 +5268,11 @@ async function createMatchAndOdds() {
                                             market,
                                           )
                                         }
-                                        className={`rounded-xl border p-4 text-left transition ${
+                                        aria-pressed={selected}
+                                        className={`min-h-[104px] rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-[#f5b400] focus:ring-offset-1 ${
                                           selected
-                                            ? "border-[#f5b400] bg-[#fff8dc]"
-                                            : "border-slate-200 bg-white hover:border-slate-400"
+                                            ? "border-[#f5b400] bg-[#fff8dc] shadow-sm"
+                                            : "border-slate-200 bg-white hover:border-slate-400 hover:bg-slate-50"
                                         }`}
                                       >
                                         <div className="flex items-center justify-between gap-3">
@@ -5215,11 +5295,14 @@ async function createMatchAndOdds() {
                                           </span>
                                         </div>
 
-                                        <div className="mt-2 text-[10px] uppercase tracking-wider text-slate-400">
-                                          {
-                                            market.market_key
-                                          }
+                                        <div className="mt-2 break-words text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                          Market code · {market.market_key}
                                         </div>
+                                        {selected && (
+                                          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#071b34] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white">
+                                            <span aria-hidden="true">✓</span> Included
+                                          </div>
+                                        )}
                                       </button>
                                     );
                                   },
@@ -5262,12 +5345,14 @@ async function createMatchAndOdds() {
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <h3 className="text-xl font-black text-[#071b34]">
-                            Configure Odds
+                            Set market outcomes & odds
                           </h3>
 
-                          <p className="mt-1 text-sm text-slate-500">
-                            {homeTeam} vs{" "}
-                            {awayTeam}
+                          <p className="mt-1 text-sm font-semibold text-slate-600">
+                            {homeTeam} vs {awayTeam}
+                          </p>
+                          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                            Enter every outcome customers can select and its decimal price (for example, 2.10). Totals, Asian handicap, and corner handicap use numeric lines such as 2.5 or -1.0. Three-way handicap presets show their handicap directly in each selection, such as Home (0:1).
                           </p>
                         </div>
 
@@ -5278,6 +5363,11 @@ async function createMatchAndOdds() {
                           markets selected
                         </div>
                       </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm font-extrabold text-[#071b34]">Publishing checklist</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">Review team names, market outcomes, lines and prices before publishing. Only enter verified odds; this form does not generate or verify prices automatically.</p>
                     </div>
 
                     {selectedMarkets.map(
@@ -5334,7 +5424,13 @@ async function createMatchAndOdds() {
                               </button>
                             </div>
 
-                            <div className="mt-5 space-y-3">
+                            <div className="mt-5 hidden grid-cols-[minmax(0,1fr)_140px_120px_auto] gap-3 px-3 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 sm:grid">
+                              <span>Outcome / selection</span>
+                              {needsLine ? <span>Line</span> : <span />}
+                              <span>Decimal odds</span>
+                              <span>Action</span>
+                            </div>
+                            <div className="mt-3 space-y-3">
                               {form.selections.map(
                                 (
                                   odd,
@@ -5357,8 +5453,9 @@ async function createMatchAndOdds() {
                                           event.target.value,
                                         )
                                       }
-                                      placeholder="Selection"
-                                      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#f5b400]"
+                                      aria-label={`${form.market.market_name} outcome or selection`}
+                                      placeholder="Outcome / selection"
+                                      className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/30"
                                     />
 
                                     {needsLine && (
@@ -5374,10 +5471,11 @@ async function createMatchAndOdds() {
                                             event.target.value,
                                           )
                                         }
-                                        placeholder="Line"
+                                        aria-label={`${form.market.market_name} line`}
+                                        placeholder="e.g. 2.5"
                                         type="number"
                                         step="0.01"
-                                        className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#f5b400]"
+                                        className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/30"
                                       />
                                     )}
 
@@ -5397,11 +5495,12 @@ async function createMatchAndOdds() {
                                           event.target.value,
                                         )
                                       }
-                                      placeholder="Odds"
+                                      aria-label={`${form.market.market_name} decimal odds`}
+                                      placeholder="e.g. 2.10"
                                       type="number"
                                       step="0.01"
                                       min="1.01"
-                                      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#f5b400]"
+                                      className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-extrabold outline-none focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/30"
                                     />
 
                                     <button
