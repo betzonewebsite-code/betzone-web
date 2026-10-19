@@ -393,9 +393,20 @@ function getDefaultSelections(
     return ["Home or Draw (1X)", "Home or Away (12)", "Draw or Away (X2)"];
   }
 
-  if (key === "1x2-1up" || key === "1x2-2up" || key === "1x2-never-down" || key.includes("score-2-in-row") || key.includes("score-3-in-row")) {
-    return ["Yes", "No"];
-  }
+  if (
+  key === "1x2-1up" ||
+  key === "1x2-2up" ||
+  key === "1x2-never-down"
+) {
+  return [homeTeam || "Home", "Draw", awayTeam || "Away"];
+}
+
+if (
+  key.includes("score-2-in-row") ||
+  key.includes("score-3-in-row")
+) {
+  return ["Yes", "No"];
+}
 
   if (key === "first-goal" || key === "first-corner" || key === "last-corner") {
     return [homeTeam || "Home", "No Goal / None", awayTeam || "Away"];
