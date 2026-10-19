@@ -393,20 +393,9 @@ function getDefaultSelections(
     return ["Home or Draw (1X)", "Home or Away (12)", "Draw or Away (X2)"];
   }
 
-  if (
-  key === "1x2-1up" ||
-  key === "1x2-2up" ||
-  key === "1x2-never-down"
-) {
-  return [homeTeam || "Home", "Draw", awayTeam || "Away"];
-}
-
-if (
-  key.includes("score-2-in-row") ||
-  key.includes("score-3-in-row")
-) {
-  return ["Yes", "No"];
-}
+  if (key === "1x2-1up" || key === "1x2-2up" || key === "1x2-never-down" || key.includes("score-2-in-row") || key.includes("score-3-in-row")) {
+    return ["Yes", "No"];
+  }
 
   if (key === "first-goal" || key === "first-corner" || key === "last-corner") {
     return [homeTeam || "Home", "No Goal / None", awayTeam || "Away"];
@@ -581,18 +570,15 @@ if (
     "No",
   ];
 }
+
 function marketNeedsLine(
   marketKey: string,
 ) {
   const key = marketKey.toLowerCase();
 
-  // These markets do not need a separate line field.
-  if (
-    key === "double-chance" ||
-    key === "first-half-double-chance" ||
-    key === "three-way-handicap" ||
-    key === "first-half-handicap"
-  ) {
+  // Three-way handicap presets include the handicap in the selection label
+  // (for example, "Home (0:1)") because the database line column is Decimal.
+  if (key === "three-way-handicap" || key === "first-half-handicap") {
     return false;
   }
 
@@ -5487,7 +5473,7 @@ async function createMatchAndOdds() {
                                         }
                                         aria-label={`${form.market.market_name} line`}
                                         placeholder="e.g. 2.5"
-                                        type="number"
+                                        type="text" inputMode="text" enterKeyHint="done"
                                         step="0.01"
                                         className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/30"
                                       />
@@ -5511,7 +5497,7 @@ async function createMatchAndOdds() {
                                       }
                                       aria-label={`${form.market.market_name} decimal odds`}
                                       placeholder="e.g. 2.10"
-                                      type="number"
+                                      type="text" inputMode="text" enterKeyHint="done"
                                       step="0.01"
                                       min="1.01"
                                       className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-extrabold outline-none focus:border-[#f5b400] focus:ring-2 focus:ring-[#f5b400]/30"
@@ -6875,9 +6861,9 @@ async function createMatchAndOdds() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h4 className="text-lg font-black text-[#071b34]">Betting Limits</h4>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Stake<input type="number" min="0" step="0.01" value={minimumStake} onChange={(e) => setMinimumStake(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Stake<input type="number" min="0" step="0.01" value={maximumStake} onChange={(e) => setMaximumStake(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Payout<input type="number" min="0" step="0.01" value={maximumPayout} onChange={(e) => setMaximumPayout(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Stake<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={minimumStake} onChange={(e) => setMinimumStake(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Stake<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={maximumStake} onChange={(e) => setMaximumStake(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Payout<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={maximumPayout} onChange={(e) => setMaximumPayout(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
                   </div>
                   <div className="mt-5 space-y-3">
                     {([['Betting Enabled', bettingEnabled, setBettingEnabled], ['Single Bets', singleBetsEnabled, setSingleBetsEnabled], ['Accumulator Bets', accumulatorBetsEnabled, setAccumulatorBetsEnabled]] as Array<[string, boolean, React.Dispatch<React.SetStateAction<boolean>>]>).map(([label, value, setter]) => (
@@ -6889,10 +6875,10 @@ async function createMatchAndOdds() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h4 className="text-lg font-black text-[#071b34]">Wallet & Transactions</h4>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Deposit<input type="number" min="0" step="0.01" value={minimumDeposit} onChange={(e) => setMinimumDeposit(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Deposit<input type="number" min="0" step="0.01" value={maximumDeposit} onChange={(e) => setMaximumDeposit(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Withdrawal<input type="number" min="0" step="0.01" value={minimumWithdrawal} onChange={(e) => setMinimumWithdrawal(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
-                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Withdrawal<input type="number" min="0" step="0.01" value={maximumWithdrawal} onChange={(e) => setMaximumWithdrawal(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Deposit<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={minimumDeposit} onChange={(e) => setMinimumDeposit(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Deposit<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={maximumDeposit} onChange={(e) => setMaximumDeposit(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum Withdrawal<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={minimumWithdrawal} onChange={(e) => setMinimumWithdrawal(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum Withdrawal<input type="text" inputMode="text" enterKeyHint="done" min="0" step="0.01" value={maximumWithdrawal} onChange={(e) => setMaximumWithdrawal(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
                   </div>
                   <div className="mt-5 space-y-3">
                     {([['Deposits Enabled', depositsEnabled, setDepositsEnabled], ['Withdrawals Enabled', withdrawalsEnabled, setWithdrawalsEnabled], ['Maintenance Mode', maintenanceMode, setMaintenanceMode]] as Array<[string, boolean, React.Dispatch<React.SetStateAction<boolean>>]>).map(([label, value, setter]) => (
@@ -6976,8 +6962,8 @@ async function createMatchAndOdds() {
                   <h4 className="text-lg font-black text-[#071b34]">Login Security</h4>
                   <div className="mt-4 space-y-3">
                     <button type="button" onClick={() => setTwoFactorRequired((value) => !value)} className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left"><span><span className="block text-sm font-black text-[#071b34]">Require Two-Factor Authentication</span><span className="mt-1 block text-xs text-slate-500">Require 2FA for administrator accounts.</span></span><span className={`rounded-full px-3 py-1 text-[10px] font-black ${twoFactorRequired ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{twoFactorRequired ? 'ON' : 'OFF'}</span></button>
-                    <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Maximum Failed Login Attempts<input type="number" min="1" max="20" value={maxLoginAttempts} onChange={(e) => setMaxLoginAttempts(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
-                    <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Admin Session Timeout (minutes)<input type="number" min="5" max="1440" value={sessionTimeout} onChange={(e) => setSessionTimeout(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Maximum Failed Login Attempts<input type="text" inputMode="text" enterKeyHint="done" min="1" max="20" value={maxLoginAttempts} onChange={(e) => setMaxLoginAttempts(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
+                    <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Admin Session Timeout (minutes)<input type="text" inputMode="text" enterKeyHint="done" min="5" max="1440" value={sessionTimeout} onChange={(e) => setSessionTimeout(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#f5b400]" /></label>
                   </div>
                 </div>
 
@@ -7988,7 +7974,7 @@ async function createMatchAndOdds() {
                               Odds
                             </label>
                             <input
-                              type="number"
+                              type="text" inputMode="text" enterKeyHint="done"
                               min="1.01"
                               step="0.01"
                               value={odd.odds}
@@ -8008,7 +7994,7 @@ async function createMatchAndOdds() {
                               Line
                             </label>
                             <input
-                              type="number"
+                              type="text" inputMode="text" enterKeyHint="done"
                               step="0.01"
                               value={odd.line}
                               onChange={(event) =>
@@ -8111,7 +8097,7 @@ async function createMatchAndOdds() {
                   </label>
 
                   <input
-                    type="number"
+                    type="text" inputMode="text" enterKeyHint="done"
                     min="0"
                     value={
                       homeScore
@@ -8131,7 +8117,7 @@ async function createMatchAndOdds() {
                   </label>
 
                   <input
-                    type="number"
+                    type="text" inputMode="text" enterKeyHint="done"
                     min="0"
                     value={
                       awayScore
