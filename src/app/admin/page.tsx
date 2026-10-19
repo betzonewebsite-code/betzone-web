@@ -576,14 +576,26 @@ function getDefaultSelections(
   ];
 }
 
+
 function marketNeedsLine(
   marketKey: string,
 ) {
   const key = marketKey.toLowerCase();
 
-  // Three-way handicap presets include the handicap in the selection label
-  // (for example, "Home (0:1)") because the database line column is Decimal.
-  if (key === "three-way-handicap" || key === "first-half-handicap") {
+  // Double Chance markets do not require a line.
+  if (
+    key === "double-chance" ||
+    key === "first-half-double-chance"
+  ) {
+    return false;
+  }
+
+  // Three-way handicap presets include the handicap
+  // in the selection label.
+  if (
+    key === "three-way-handicap" ||
+    key === "first-half-handicap"
+  ) {
     return false;
   }
 
@@ -596,6 +608,7 @@ function marketNeedsLine(
     key === "asian-handicap"
   );
 }
+
 
 function getGroupLabel(
   market: Market,
