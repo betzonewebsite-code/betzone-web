@@ -334,9 +334,9 @@ function getErrorMessage(
 }
 
 const BETZONE_EXTRA_MARKETS: Market[] = [
-  { market_key: "1x2-1up", market_name: "1X2 — Home Win / 1 Up", market_group: "Match Result", sort_order: 10, is_active: true },
-  { market_key: "1x2-2up", market_name: "1X2 — Away Win / 2 Up", market_group: "Match Result", sort_order: 11, is_active: true },
-  { market_key: "1x2-never-down", market_name: "1X2 — Never Down", market_group: "Match Result", sort_order: 12, is_active: true },
+  { market_key: "1x2-1up", market_name: "1X2 — 1 Up (Home / Draw / Away)", market_group: "Match Result", sort_order: 10, is_active: true },
+  { market_key: "1x2-2up", market_name: "1X2 — 2 Up (Home / Draw / Away)", market_group: "Match Result", sort_order: 11, is_active: true },
+  { market_key: "1x2-never-down", market_name: "1X2 — Never Down (Home / Draw / Away)", market_group: "Match Result", sort_order: 12, is_active: true },
   { market_key: "double-chance", market_name: "Double Chance (Home or Draw / Home or Away / Draw or Away)", market_group: "Match Result", sort_order: 20, is_active: true },
   { market_key: "first-goal", market_name: "First Goal", market_group: "Goals", sort_order: 30, is_active: true },
   { market_key: "total-goals", market_name: "Total Goals — Over/Under", market_group: "Goals", sort_order: 31, is_active: true },
@@ -393,7 +393,12 @@ function getDefaultSelections(
     return ["Home or Draw (1X)", "Home or Away (12)", "Draw or Away (X2)"];
   }
 
-  if (key === "1x2-1up" || key === "1x2-2up" || key === "1x2-never-down" || key.includes("score-2-in-row") || key.includes("score-3-in-row")) {
+  // These match-result markets use three-way outcomes, not Yes/No.
+  if (key === "1x2-1up" || key === "1x2-2up" || key === "1x2-never-down") {
+    return [homeTeam || "Home", "Draw", awayTeam || "Away"];
+  }
+
+  if (key.includes("score-2-in-row") || key.includes("score-3-in-row")) {
     return ["Yes", "No"];
   }
 
