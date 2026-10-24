@@ -5854,155 +5854,224 @@ const currentOdds = [
         </div>
       )}
       <style jsx global>{`
-        /* BETZONE sportsbook skin: visual-only overrides; application logic is unchanged. */
+        /* BETZONE sportsbook skin v2: visual-only overrides; application logic is unchanged.
+           Layout: dark top bar, accent sports strip, compact flat match rows,
+           flat odds tiles, sticky betslip, icon bottom-nav on mobile. */
         .betzone-page {
-          --bz-green: #008b45;
-          --bz-green-dark: #004d32;
-          --bz-red: #ed1026;
-          --bz-white: #ffffff;
-          background: #f3f5f6 !important;
-          color: #102a24;
+          --bz-bg: #eef1f3;
+          --bz-card: #ffffff;
+          --bz-line: #e1e6ea;
+          --bz-ink: #1a2128;
+          --bz-muted: #6b7782;
+          --bz-dark: #151a20;
+          --bz-dark-2: #1f262e;
+          --bz-green: #0aa05a;
+          --bz-green-dark: #077a45;
+          --bz-green-soft: #e6f6ee;
+          --bz-red: #e5322d;
+          background: var(--bz-bg) !important;
+          color: var(--bz-ink);
+          font-feature-settings: "tnum" 1;
         }
+        .betzone-page button { transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .1s ease; }
+        .betzone-page button:active:not(:disabled) { transform: scale(.98); }
+
+        /* ---------- Top bar ---------- */
         .betzone-page > header {
-          background: linear-gradient(105deg, #004b31 0%, #00823e 45%, #003e2b 100%) !important;
-          border-bottom: 3px solid var(--bz-red);
+          background: var(--bz-dark) !important;
+          border-bottom: 2px solid var(--bz-green);
+          box-shadow: 0 2px 10px rgb(0 0 0 / 25%) !important;
         }
-        .betzone-page > header > div {
-          max-width: 1600px !important;
-          min-height: 64px;
-        }
+        .betzone-page > header > div { max-width: 1600px !important; min-height: 58px; }
         .betzone-page > header button[class*="bg-[#f5b400]"] {
-          background: var(--bz-red) !important;
+          background: var(--bz-green) !important;
           color: #fff !important;
+          border-radius: 6px !important;
         }
-        .betzone-page > header button,
-        .betzone-page button {
-          transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+        .betzone-page > header button[class*="bg-[#f5b400]"]:hover { background: var(--bz-green-dark) !important; }
+        .betzone-page > header button[class*="bg-white/5"] {
+          border-radius: 6px !important;
+          border-color: rgb(255 255 255 / 18%) !important;
         }
-        .betzone-page section.border-b.bg-white {
-          border-color: #e3e9e6 !important;
-        }
-        /* Sports navigation: red strip directly below the green header. */
-        .betzone-page .betzone-sports-nav {
-          background: #ed1026 !important;
-          border-bottom: 2px solid #c90c20 !important;
-          color: #fff !important;
-        }
-        .betzone-page .betzone-sports-nav button {
-          border-color: rgb(255 255 255 / 30%) !important;
-          color: #fff !important;
-        }
-        .betzone-page .betzone-sports-nav button[class*="bg-[#071b34]"],
-        .betzone-page .betzone-sports-nav button[class*="bg-[#008b45]"] {
-          background: #008b45 !important;
-          border-color: #fff !important;
-          color: #fff !important;
-        }
-        .betzone-page .betzone-sports-nav button[class*="bg-[#f4f6f8]"],
-        .betzone-page .betzone-sports-nav button[class*="bg-[#fff9df]"] {
-          background: rgb(255 255 255 / 12%) !important;
-        }
+
+        /* ---------- Sports strip ---------- */
+        .betzone-page .betzone-sports-nav,
         .betzone-page .betzone-desktop-sports-nav {
-          background: #ed1026 !important;
-          border-bottom: 2px solid #c90c20 !important;
+          background: var(--bz-dark-2) !important;
+          border-bottom: 1px solid #000 !important;
         }
+        .betzone-page .betzone-sports-nav button,
         .betzone-page .betzone-desktop-sports-nav > div > div > button {
-          border-color: rgb(255 255 255 / 35%) !important;
-          background: rgb(255 255 255 / 10%) !important;
-          color: #fff !important;
+          background: transparent !important;
+          border: 0 !important;
+          border-bottom: 3px solid transparent !important;
+          border-radius: 0 !important;
+          color: #c9d1d8 !important;
         }
-        .betzone-page .betzone-desktop-sports-nav button span {
-          color: #fff !important;
-        }
+        .betzone-page .betzone-desktop-sports-nav button span,
+        .betzone-page .betzone-sports-nav button span { color: inherit !important; }
+        .betzone-page .betzone-sports-nav button[class*="bg-[#071b34]"],
+        .betzone-page .betzone-sports-nav button[class*="bg-[#008b45]"],
         .betzone-page .betzone-desktop-sports-nav button[class*="bg-[#008b45]"],
         .betzone-page .betzone-desktop-sports-nav button[class*="bg-[#071b34]"] {
-          background: #008b45 !important;
+          background: rgb(10 160 90 / 14%) !important;
+          border-bottom-color: var(--bz-green) !important;
           color: #fff !important;
         }
-        .betzone-page section.border-b.bg-white > div > div.overflow-hidden.rounded-2xl {
-          border-radius: 8px !important;
-          box-shadow: 0 2px 8px rgb(0 55 35 / 8%) !important;
-        }
-        .betzone-page section.border-b.bg-white > div > div.overflow-hidden.rounded-2xl > div:first-child {
-          background: linear-gradient(100deg, #004d32, #007a40) !important;
-        }
+        .betzone-page .betzone-sports-nav button:hover,
+        .betzone-page .betzone-desktop-sports-nav > div > div > button:hover { color: #fff !important; }
+
+        /* ---------- Page grid ---------- */
         .betzone-page [class*="grid-cols-[220px_minmax(0,1fr)_380px]"] {
           max-width: 1600px !important;
-          grid-template-columns: 250px minmax(0, 1fr) 330px !important;
-          gap: 16px !important;
+          grid-template-columns: 240px minmax(0, 1fr) 340px !important;
+          gap: 12px !important;
         }
-        .betzone-page aside.hidden.h-fit,
-        .betzone-page [class*="lg:grid-cols-[220px_minmax(0,1fr)_380px]"] aside {
-          border: 1px solid #dfe7e2;
-          border-radius: 8px !important;
+
+        /* ---------- Cards / panels ---------- */
+        .betzone-page [class*="rounded-2xl"],
+        .betzone-page [class*="rounded-xl"] { border-radius: 6px !important; }
+        .betzone-page [class*="rounded-2xl"][class*="border-gray-200"],
+        .betzone-page [class*="rounded-xl"][class*="border-gray-200"],
+        .betzone-page .rounded-xl.border.border-gray-200.bg-white,
+        .betzone-page .rounded-xl.border.border-gray-200.bg-gray-50 {
+          border-color: var(--bz-line) !important;
+          box-shadow: none !important;
         }
-        .betzone-page aside > div:first-child,
-        .betzone-page [class*="bg-[#071b34]"] {
-          --tw-bg-opacity: 1;
+        .betzone-page section.border-b.bg-white { border-color: var(--bz-line) !important; }
+
+        /* Left league menu */
+        .betzone-page aside.hidden.h-fit {
+          border: 1px solid var(--bz-line);
+          border-radius: 6px !important;
+          box-shadow: none !important;
         }
-        .betzone-page aside > div:first-child {
-          background: linear-gradient(100deg, #004d32, #007a40) !important;
+        .betzone-page aside > div:first-child { background: var(--bz-dark-2) !important; }
+        .betzone-page aside.hidden.h-fit button {
+          border-color: #eef1f3 !important;
+          padding-top: 11px !important;
+          padding-bottom: 11px !important;
+          font-weight: 700 !important;
+          color: var(--bz-ink);
         }
+        .betzone-page aside.hidden.h-fit button[class*="bg-[#008b45]"] {
+          background: var(--bz-green-soft) !important;
+          color: var(--bz-green-dark) !important;
+          box-shadow: inset 3px 0 0 var(--bz-green);
+        }
+        .betzone-page aside.hidden.h-fit button[class*="bg-[#008b45]"] span { color: var(--bz-green-dark) !important; }
+
+        /* Section tabs (Football / Today / Live) */
+        .betzone-page nav[aria-label="Homepage sections"] {
+          background: var(--bz-dark-2) !important;
+          border: 0 !important;
+          padding: 0 !important;
+          gap: 0 !important;
+          border-radius: 6px !important;
+        }
+        .betzone-page nav[aria-label="Homepage sections"] button {
+          border-radius: 0 !important;
+          border: 0 !important;
+          border-bottom: 3px solid transparent !important;
+          background: transparent !important;
+          color: #c9d1d8 !important;
+          padding: 12px 16px !important;
+        }
+        .betzone-page nav[aria-label="Homepage sections"] button[class*="bg-[#008b45]"],
+        .betzone-page nav[aria-label="Homepage sections"] button[class*="bg-[#071b34]"],
+        .betzone-page nav[aria-label="Homepage sections"] button[class*="bg-[#f5b400]"] {
+          color: #fff !important;
+          border-bottom-color: var(--bz-green) !important;
+          background: rgb(10 160 90 / 14%) !important;
+        }
+
+        /* Hero / league header bars */
         .betzone-page section.min-w-0 > div.mb-4.overflow-hidden.rounded-2xl {
-          background: linear-gradient(115deg, #004d32, #006e3b) !important;
-          border-radius: 8px !important;
+          background: var(--bz-dark-2) !important;
+          border-radius: 6px !important;
         }
-        .betzone-page .rounded-xl.border.border-gray-200.bg-gray-50,
-        .betzone-page .rounded-xl.border.border-gray-200.bg-white {
-          border-color: #dfe7e2 !important;
+        .betzone-page section.border-b.bg-white > div > div.overflow-hidden.rounded-2xl > div:first-child {
+          background: var(--bz-dark-2) !important;
+          color: #fff;
         }
-        .betzone-page button[class*="border-[#071b34]"],
-        .betzone-page button[class*="bg-[#071b34]"] {
+
+        /* ---------- Odds tiles: flat, compact, green when selected ---------- */
+        .betzone-page button[class*="bg-[#e8f5ec]"] {
+          background: #f3f5f7 !important;
+          border: 1px solid #e1e6ea !important;
+          border-radius: 4px !important;
+          color: var(--bz-ink) !important;
+        }
+        .betzone-page button[class*="bg-[#e8f5ec]"] span { color: var(--bz-ink) !important; }
+        .betzone-page button[class*="bg-[#e8f5ec]"] span:first-child { color: var(--bz-muted) !important; }
+        .betzone-page button[class*="bg-[#e8f5ec]"]:hover {
+          background: var(--bz-green-soft) !important;
           border-color: var(--bz-green) !important;
         }
+        .betzone-page button[class*="border-[#008b45]"][class*="bg-[#008b45]"] {
+          background: var(--bz-green) !important;
+          border-color: var(--bz-green-dark) !important;
+          box-shadow: none !important;
+        }
+        .betzone-page button[class*="border-[#008b45]"][class*="bg-[#008b45]"] span { color: #fff !important; }
+
+        /* Primary buttons */
+        .betzone-page button[class*="bg-[#008b45]"]:not([class*="border-[#008b45]"]) { background: var(--bz-green) !important; border-radius: 6px !important; }
+        .betzone-page button[class*="bg-[#008b45]"]:hover:not([class*="border-[#008b45]"]) { background: var(--bz-green-dark) !important; }
         .betzone-page button[class*="bg-[#f5b400]"],
         .betzone-page [class*="bg-[#f5b400]"] {
-          background-color: var(--bz-red) !important;
+          background-color: var(--bz-green) !important;
           color: #fff !important;
         }
+        .betzone-page button[class*="border-[#071b34]"],
+        .betzone-page button[class*="bg-[#071b34]"] { border-color: var(--bz-green) !important; }
         .betzone-page button[class*="hover:border-[#071b34]"]:hover,
-        .betzone-page button[class*="hover:border-[#f5b400]"]:hover {
-          border-color: var(--bz-green) !important;
-        }
+        .betzone-page button[class*="hover:border-[#f5b400]"]:hover { border-color: var(--bz-green) !important; }
         .betzone-page button[class*="text-[#071b34]"],
         .betzone-page h1[class*="text-[#071b34]"],
-        .betzone-page h2[class*="text-[#071b34]"] {
-          color: #12382b;
-        }
-        .betzone-page [class*="rounded-2xl"][class*="border-gray-200"],
-        .betzone-page [class*="rounded-xl"][class*="border-gray-200"] {
-          border-color: #dfe7e2 !important;
-        }
+        .betzone-page h2[class*="text-[#071b34]"] { color: var(--bz-ink); }
+
+        /* LIVE badge */
+        .betzone-page [class*="text-red-600"] { color: var(--bz-red) !important; }
+
+        /* ---------- Betslip ---------- */
+        .betzone-page #mobile-betslip { border-radius: 6px; box-shadow: 0 2px 10px rgb(0 0 0 / 8%) !important; }
+        .betzone-page #mobile-betslip > div[class*="bg-[#071b34]"] { background: var(--bz-dark-2) !important; }
+        .betzone-page #mobile-betslip span[class*="bg-[#f5b400]"] { background: var(--bz-green) !important; color: #fff !important; }
+        .betzone-page #mobile-betslip span[class*="bg-[#f5b400]"][class*="absolute"] { background: var(--bz-green) !important; }
+
+        /* ---------- Inputs ---------- */
         .betzone-page input,
         .betzone-page select,
-        .betzone-page textarea {
-          border-radius: 8px;
-        }
+        .betzone-page textarea { border-radius: 6px; }
         .betzone-page input:focus,
         .betzone-page select:focus,
         .betzone-page textarea:focus {
           border-color: var(--bz-green) !important;
-          --tw-ring-color: rgb(0 139 69 / 25%) !important;
+          --tw-ring-color: rgb(10 160 90 / 25%) !important;
         }
+
+        /* ---------- Mobile bottom nav ---------- */
         .betzone-page nav.fixed {
-          background: linear-gradient(100deg, #004d32, #006c3b) !important;
-          border-color: #ed1026 !important;
+          background: var(--bz-dark) !important;
+          border-top: 2px solid var(--bz-green) !important;
+          border-color: var(--bz-green) !important;
         }
-        .betzone-page nav.fixed [class*="bg-[#f5b400]"] {
-          background: var(--bz-red) !important;
-          color: #fff !important;
-        }
-        /* Keep the existing mobile interface naturally responsive; do not zoom the whole page. */
+        .betzone-page nav.fixed button { color: #aeb8c1 !important; }
+        .betzone-page nav.fixed button[class*="text-[#f5b400]"],
+        .betzone-page nav.fixed button[class*="text-white"] { color: #fff !important; }
+        .betzone-page nav.fixed [class*="bg-[#f5b400]"] { background: var(--bz-green) !important; color: #fff !important; }
+
+        /* ---------- Responsive ---------- */
         @media (max-width: 1023px) {
           .betzone-page [class*="grid-cols-[220px_minmax(0,1fr)_380px]"] {
             grid-template-columns: minmax(0, 1fr) !important;
+            gap: 8px !important;
           }
         }
         @media (max-width: 639px) {
-          .betzone-page {
-            width: 100%;
-            overflow-x: clip;
-          }
+          .betzone-page { width: 100%; overflow-x: clip; }
+          .betzone-page > header > div { min-height: 52px; }
           .betzone-page [class*="text-2xl"] { font-size: 1.25rem !important; line-height: 1.35 !important; }
           .betzone-page [class*="text-xl"] { font-size: 1.125rem !important; line-height: 1.35 !important; }
           .betzone-page [class*="text-lg"] { font-size: 1rem !important; line-height: 1.35 !important; }
